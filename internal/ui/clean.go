@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -135,12 +136,15 @@ func (m *cleaner) Update(msg tea.Msg) (screen, tea.Cmd) {
 		return m, m.next()
 	case sudoMsg:
 		if msg.err != nil {
-			m.failures = append(m.failures, "System items skipped: sudo did not get a password")
+			m.failures = append(m.failures, "System items skipped: "+msg.err.Error())
 			return m, m.finish()
 		}
 		m.current = "system items (sudo)"
 		return m, m.cleanRoot()
 	case rootDoneMsg:
+		if errors.Is(msg.err, clean.ErrSudoNotCached) {
+			return m, m.cleanRootAsking()
+		}
 		if msg.err != nil {
 			m.failures = append(m.failures, "System items failed: "+msg.err.Error())
 		}
@@ -345,7 +349,8 @@ func (m *cleaner) next() tea.Cmd {
 	}
 	if len(m.rootPicked()) > 0 {
 		m.current = "waiting for sudo"
-		return tea.ExecProcess(clean.SudoValidate(), func(err error) tea.Msg { return sudoMsg{err} })
+		s := clean.SudoValidate()
+		return tea.ExecProcess(s.Cmd, func(err error) tea.Msg { return sudoMsg{s.Err(err)} })
 	}
 	return m.finish()
 }
@@ -366,6 +371,21 @@ func (m *cleaner) cleanRoot() tea.Cmd {
 		reps, err := clean.CleanAsRoot(ctx, c, fs)
 		return rootDoneMsg{reps, err}
 	}
+}
+
+// cleanRootAsking runs the root helper on the terminal, for when sudo kept
+// no login after the password was given and has to ask again.
+func (m *cleaner) cleanRootAsking() tea.Cmd {
+	m.current = "waiting for sudo"
+	h, err := clean.RootHelper(m.rootPicked())
+	if err != nil {
+		return func() tea.Msg { return rootDoneMsg{err: err} }
+	}
+	c := m.c
+	return tea.ExecProcess(h.Cmd, func(err error) tea.Msg {
+		reps, err := h.Reports(c, err)
+		return rootDoneMsg{reps, err}
+	})
 }
 
 func (m *cleaner) addReport(r clean.Report) {

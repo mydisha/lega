@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -150,6 +151,18 @@ func plainClean(ctx context.Context, env platform.Env, o options, w io.Writer) e
 		return nil
 	}
 
+	// Settle sudo before anything is removed, so a missing password does
+	// not leave the clean half done.
+	if len(rootPicked) > 0 {
+		err := clean.SudoReady(ctx, c, func(s *clean.SudoCall) error {
+			s.Cmd.Stdin, s.Cmd.Stdout = os.Stdin, os.Stdout
+			return s.Cmd.Run()
+		})
+		if err != nil {
+			return fmt.Errorf("--system: %w; nothing was removed", err)
+		}
+	}
+
 	var freed int64
 	var failed int
 	for _, f := range picked {
@@ -158,14 +171,9 @@ func plainClean(ctx context.Context, env platform.Env, o options, w io.Writer) e
 		failed += len(rep.Failures)
 	}
 	if len(rootPicked) > 0 {
-		v := clean.SudoValidate()
-		v.Stdin, v.Stdout, v.Stderr = os.Stdin, os.Stdout, os.Stderr
-		if err := v.Run(); err != nil {
-			return fmt.Errorf("sudo: %w", err)
-		}
-		reps, err := clean.CleanAsRoot(ctx, c, rootPicked)
+		reps, err := cleanRoot(ctx, c, rootPicked)
 		if err != nil {
-			return err
+			return fmt.Errorf("system items: %w", err)
 		}
 		for _, rep := range reps {
 			freed += rep.Freed
@@ -178,6 +186,21 @@ func plainClean(ctx context.Context, env platform.Env, o options, w io.Writer) e
 	}
 	fmt.Fprintln(w)
 	return nil
+}
+
+// cleanRoot runs the root findings through sudo. When sudo kept no login
+// after SudoReady, the helper runs on the terminal so sudo can ask again.
+func cleanRoot(ctx context.Context, c *clean.Context, found []clean.Finding) ([]clean.Report, error) {
+	reps, err := clean.CleanAsRoot(ctx, c, found)
+	if !errors.Is(err, clean.ErrSudoNotCached) {
+		return reps, err
+	}
+	h, err := clean.RootHelper(found)
+	if err != nil {
+		return nil, err
+	}
+	h.Cmd.Stdin = os.Stdin
+	return h.Reports(c, h.Cmd.Run())
 }
 
 // plainPurge lists artifacts (--dry-run) or removes the ones not used in

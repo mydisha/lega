@@ -207,9 +207,31 @@ func TestCleanLockedAndRoot(t *testing.T) {
 	if m.phase != phaseWork || m.current != "waiting for sudo" {
 		t.Fatalf("should wait for sudo, phase %v current %q", m.phase, m.current)
 	}
-	m.Update(sudoMsg{err: errors.New("cancelled")})
-	if m.phase != phaseDone || !strings.Contains(ansi.Strip(m.View()), "sudo did not get a password") {
+	// The reason sudo gave is shown, not a generic message.
+	m.Update(sudoMsg{err: errors.New("sudo: 3 incorrect password attempts")})
+	if m.phase != phaseDone || !strings.Contains(ansi.Strip(m.View()), "System items skipped: sudo: 3 incorrect password attempts") {
 		t.Errorf("sudo failure not reported:\n%s", ansi.Strip(m.View()))
+	}
+}
+
+func TestCleanRootAsksAgainWhenSudoKeepsNoLogin(t *testing.T) {
+	sh := testShared(t, 80)
+	c := cleanContext(t, sh)
+	m := newCleanerWith(sh, c, []clean.Rule{fakeRoot{}})
+	m = settle(m, m.Init()).(*cleaner)
+	m.phase = phaseWork
+
+	_, cmd := m.Update(rootDoneMsg{err: clean.ErrSudoNotCached})
+	if cmd == nil || m.phase != phaseWork || m.current != "waiting for sudo" {
+		t.Fatalf("should hand the terminal to sudo again: cmd %v, phase %v, current %q", cmd != nil, m.phase, m.current)
+	}
+	if len(m.failures) != 0 {
+		t.Errorf("not a failure yet: %v", m.failures)
+	}
+
+	m.Update(rootDoneMsg{err: errors.New("sudo did not get a password")})
+	if m.phase != phaseDone || !strings.Contains(ansi.Strip(m.View()), "System items failed: sudo did not get a password") {
+		t.Errorf("second sudo failure not reported:\n%s", ansi.Strip(m.View()))
 	}
 }
 

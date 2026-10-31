@@ -190,9 +190,9 @@ func TestRunRoot(t *testing.T) {
 
 func TestCleanAsRoot(t *testing.T) {
 	c := testContext(t)
-	var argv []string
+	var calls [][]string
 	c.Run = func(ctx context.Context, name string, args ...string) ([]byte, error) {
-		argv = append([]string{name}, args...)
+		calls = append(calls, append([]string{name}, args...))
 		return []byte(`[{"id":"apt-cache","removals":[{"path":"apt-get clean","bytes":5000}]},` +
 			`{"id":"journal","removals":[{"path":"journalctl --vacuum-time=14d","bytes":0,"err":"failed"}]}]`), nil
 	}
@@ -202,6 +202,10 @@ func TestCleanAsRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(calls) != 2 || !reflect.DeepEqual(calls[0], []string{"sudo", "-n", "-v"}) {
+		t.Fatalf("calls %v, want a sudo -n -v check then the helper", calls)
+	}
+	argv := calls[1]
 	if argv[0] != "sudo" || argv[1] != "-n" || argv[3] != RootCommand || argv[4] != "apt-cache" || argv[5] != "journal" {
 		t.Errorf("argv %v", argv)
 	}
