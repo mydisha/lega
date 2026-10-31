@@ -11,7 +11,6 @@ Clean caches and junk safely, see what fills your disk, and clear out old build 
 [![Go version](https://img.shields.io/github/go-mod/go-version/mydisha/lega?logo=go&logoColor=white&label=Go)](go.mod)
 [![Built with Bubble Tea](https://img.shields.io/badge/TUI-Bubble%20Tea-ec6a2c)](https://github.com/charmbracelet/bubbletea)
 [![Platform](https://img.shields.io/badge/platform-Ubuntu%20%7C%20Mint%20%7C%20Zorin%20%7C%20Pop!__OS-E95420?logo=ubuntu&logoColor=white)](#supported-systems)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mydisha/lega)](https://goreportcard.com/report/github.com/mydisha/lega)
 [![License: MIT](https://img.shields.io/github/license/mydisha/lega)](LICENSE)
 
 </div>
