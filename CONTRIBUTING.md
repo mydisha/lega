@@ -85,16 +85,8 @@ put your rule before `generalRules()` so it wins the overlap.
 
 ## Releasing
 
-Maintainers cut a release from an up-to-date `main` whose CI is green:
-
-```sh
-make release TAG=v0.2.0
-```
-
-`scripts/release.sh` checks the branch, the working tree, the CI status of
-the commit and the tests, then pushes the tag. The Release workflow builds
-the tarballs, the `.deb` and `SHA256SUMS`, attests them and publishes the
-release. `install.sh` and `lega update` pick it up from there.
-
-Tags follow [Semantic Versioning](https://semver.org). Try the checks first
-with `scripts/release.sh v0.2.0 --dry-run`.
+Maintainers release from a green `main`, either with **Actions → Release →
+Run workflow** on GitHub or with `make release BUMP=minor`. The version,
+release notes and builds are all automatic. See
+[docs/RELEASING.md](docs/RELEASING.md) for the steps and what to do when a
+release fails.

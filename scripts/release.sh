@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Tag a release and push the tag. The Release workflow then builds the
-# binaries, the .deb and SHA256SUMS and publishes them on GitHub.
+# Release lega from your machine: check main, show the release notes, then
+# tag and push. The Release workflow builds and publishes the rest.
 #
-#   scripts/release.sh v0.2.0            check, tag and push
-#   scripts/release.sh v0.2.0 --dry-run  only run the checks
+#   scripts/release.sh minor            next version from the latest tag
+#   scripts/release.sh v1.0.0-rc.1      an exact version
+#   scripts/release.sh patch --dry-run  only run the checks
+#   scripts/release.sh minor --yes      do not ask before tagging
 #
 # Set RELEASE_SKIP_CI=1 to skip the CI status check (needs gh otherwise).
 set -euo pipefail
 
 repo=mydisha/lega
-version=""
+want=""
 dry=0
+yes=0
 
 die() {
 	printf 'release: %s\n' "$*" >&2
@@ -20,19 +23,19 @@ die() {
 for arg in "$@"; do
 	case "$arg" in
 	--dry-run) dry=1 ;;
+	--yes) yes=1 ;;
 	-h | --help)
-		sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+		sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
 		exit 0
 		;;
 	-*) die "unknown flag: $arg" ;;
 	*)
-		[ -z "$version" ] || die "give one version"
-		version="$arg"
+		[ -z "$want" ] || die "give one version or bump"
+		want="$arg"
 		;;
 	esac
 done
-[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] ||
-	die "usage: scripts/release.sh vX.Y.Z [--dry-run]"
+[ -n "$want" ] || die "usage: scripts/release.sh patch|minor|major|vX.Y.Z [--dry-run] [--yes]"
 
 cd "$(git rev-parse --show-toplevel)"
 [ "$(git branch --show-current)" = main ] || die "switch to main first"
@@ -40,17 +43,7 @@ cd "$(git rev-parse --show-toplevel)"
 git fetch --quiet --tags origin main
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] ||
 	die "main differs from origin/main; push or pull first"
-if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
-	die "$version already exists"
-fi
-
-# Versions only go up. Pre-releases are left out of this check because
-# sort -V puts v1.0.0-rc.1 after v1.0.0.
-last=$(git tag --list 'v*' | grep -v -- - | sort -V | tail -n 1 || true)
-if [ -n "$last" ] && [[ "$version" != *-* ]]; then
-	top=$(printf '%s\n%s\n' "$last" "$version" | sort -V | tail -n 1)
-	[ "$top" = "$version" ] || die "$version is older than $last"
-fi
+version=$(scripts/next-version.sh "$want")
 
 sha=$(git rev-parse HEAD)
 if [ "${RELEASE_SKIP_CI:-0}" != 1 ]; then
@@ -64,9 +57,22 @@ fi
 go vet ./...
 go test ./...
 
+printf '\n----- release notes for %s -----\n\n' "$version"
+scripts/release-notes.sh
+printf '\n-----\n\n'
+
 if [ "$dry" -eq 1 ]; then
 	printf 'All checks passed. %s was not tagged (dry run).\n' "$version"
 	exit 0
+fi
+if [ "$yes" -ne 1 ]; then
+	[ -t 0 ] || die "no terminal to confirm on; add --yes"
+	printf 'Tag %s on %s and publish it? [y/N] ' "$version" "${sha:0:7}"
+	read -r answer
+	case "$answer" in
+	y | Y | yes | YES) ;;
+	*) die "nothing was tagged" ;;
+	esac
 fi
 git tag -a "$version" -m "lega $version"
 git push origin "$version"

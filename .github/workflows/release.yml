@@ -1,34 +1,109 @@
 name: Release
 
+# Two ways in, one way out:
+#   - "Run workflow" on GitHub (or make release-gh): picks the next version,
+#     tags main, then publishes.
+#   - Pushing a vX.Y.Z tag (make release): publishes that tag.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version to raise: patch (fixes), minor (features) or major (breaking)"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: "Or an exact version, e.g. v1.0.0-rc.1 (leave empty to use the bump)"
+        required: false
 
 permissions:
-  contents: write
-  # For the build provenance attestation.
-  id-token: write
-  attestations: write
+  contents: read
+
+# Never build two releases at once.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  release:
+  tag:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+    steps:
+      - name: Only release from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Run this workflow on main, not ${GITHUB_REF_NAME}."
+          exit 1
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check that CI passed on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          result=$(gh run list -R "$GITHUB_REPOSITORY" --workflow CI --commit "$GITHUB_SHA" --limit 1 \
+            --json status,conclusion --jq '.[] | "\(.status) \(.conclusion)"')
+          if [ "$result" != "completed success" ]; then
+            echo "::error::CI has not passed on ${GITHUB_SHA::7} (got: ${result:-no run}). Wait for it or fix it, then run this again."
+            exit 1
+          fi
+      - name: Pick the version
+        id: next
+        env:
+          WANT: ${{ inputs.version || inputs.bump }}
+        run: echo "tag=$(scripts/next-version.sh "$WANT")" >> "$GITHUB_OUTPUT"
+      - name: Tag main
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "lega $TAG"
+          git push origin "$TAG"
+          echo "Tagged $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    needs: tag
+    # Runs after the tag job, or on its own when a tag was pushed
+    # (the tag job is then skipped, which must not block this one).
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # For the build provenance attestation.
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ needs.tag.outputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: refs/tags/${{ env.TAG }}
           fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
       - run: go test ./...
+      - name: Write release notes
+        run: scripts/release-notes.sh "$TAG" | tee "$RUNNER_TEMP/notes.md"
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --clean
+          args: release --clean --release-notes ${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ env.TAG }}
       # Lets anyone check a download with:
       #   gh attestation verify <file> -R mydisha/lega
       - uses: actions/attest-build-provenance@v4
         with:
           subject-checksums: ./dist/SHA256SUMS
+      - name: Summary
+        run: echo "Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}" >> "$GITHUB_STEP_SUMMARY"

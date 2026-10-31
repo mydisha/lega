@@ -34,7 +34,7 @@ nfpms:
 checksum:
   name_template: SHA256SUMS
 
+# Published release notes come from scripts/release-notes.sh (passed with
+# --release-notes), so the preview before tagging matches the release page.
 changelog:
   sort: asc
-  filters:
-    exclude: ["^docs:", "^ci:", "^chore:"]
