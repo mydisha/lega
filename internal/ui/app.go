@@ -30,6 +30,10 @@ type shared struct {
 	env     platform.Env
 	release platform.OSRelease
 	ctx     context.Context
+	// icons turns on Nerd Font icons next to names.
+	icons bool
+	// userDirs are the XDG user folders by key, read once for the icons.
+	userDirs map[string]string
 }
 
 // pushMsg opens a screen on top of the current one.

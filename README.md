@@ -164,6 +164,20 @@ space select • a all/none • enter continue • q back
 
 </details>
 
+The menu opens with a short summary of your machine: host name, OS, kernel,
+CPU and memory.
+
+### Icons
+
+lega can show icons next to folders, file types and apps (Firefox, Chrome,
+VS Code, npm, Docker and others). They need a [Nerd Font](https://www.nerdfonts.com)
+set as your terminal font, so they are off by default:
+
+```sh
+lega --icons                          # once
+export LEGA_ICONS=nerd                # always, e.g. in ~/.bashrc
+```
+
 ### Keys
 
 | Key | Action |

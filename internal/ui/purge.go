@@ -247,17 +247,18 @@ func (p *purger) View() string {
 		start, end := p.l.window(len(p.found), p.listHeight())
 		for i := start; i < end; i++ {
 			a := p.found[i]
-			marker := "  "
+			marker, icoStyle := "  ", t.Dim
 			if i == p.l.cursor {
-				marker = t.Accent.Render("▸ ")
+				marker, icoStyle = t.Accent.Render("▸ "), t.Accent
 			}
 			head := marker + checkbox(t, p.sel[i], false) + " " + right(format.Size(a.Bytes), 9) + "  "
 			tail := ""
 			if a.Recent {
 				tail = t.Dim.Render("  used " + ago(now, a.ModTime))
 			}
-			pathW := w - 2 - 4 - 9 - 2 - len("  used yesterday")
-			b.WriteString(head + fitMiddle(tilde(p.sh.env.Home, a.Path), pathW) + tail + "\n")
+			pathW := w - 2 - 4 - 9 - 2 - len("  used yesterday") - p.sh.iconWidth()
+			ico := p.sh.icon(nodeIcon(a.Path, true, nil), icoStyle)
+			b.WriteString(head + ico + fitMiddle(tilde(p.sh.env.Home, a.Path), pathW) + tail + "\n")
 		}
 		n, bytes := p.selection()
 		b.WriteString("\n" + t.Dim.Render("Folders used in the last 7 days start unselected.") + "\n")

@@ -9,6 +9,7 @@ import (
 
 	"github.com/mydisha/lega/internal/disk"
 	"github.com/mydisha/lega/internal/format"
+	"github.com/mydisha/lega/internal/platform"
 )
 
 type menuItem struct {
@@ -24,14 +25,18 @@ type menu struct {
 	l     list
 	total int64
 	free  int64
+	sys   platform.SysInfo
 }
 
-type usageMsg struct{ total, free int64 }
+type usageMsg struct {
+	total, free int64
+	sys         platform.SysInfo
+}
 
 var keyQuit = key.NewBinding(key.WithKeys("q", "esc"), key.WithHelp("q", "quit"))
 
 func newMenu(sh *shared) screen {
-	return &menu{sh: sh, items: []menuItem{
+	return &menu{sh: sh, sys: platform.ReadSysInfo(), items: []menuItem{
 		{"Status", "Disks and what fills your home folder", newStatus},
 		{"Clean", "Remove caches, logs and other junk", newCleaner},
 		{"Analyze", "Explore your home folder by size", newAnalyze("")},
@@ -41,20 +46,21 @@ func newMenu(sh *shared) screen {
 
 func (m *menu) Init() tea.Cmd { return m.usage }
 
-// usage reads the free space of the home disk. It runs again whenever the
-// menu comes back into view, since cleaning changes it.
+// usage reads the free space of the home disk and the memory in use. It
+// runs again whenever the menu comes back into view, since cleaning changes
+// it.
 func (m *menu) usage() tea.Msg {
 	total, _, free, err := disk.Usage(m.sh.env.Home)
 	if err != nil {
-		return nil
+		total, free = 0, 0
 	}
-	return usageMsg{total, free}
+	return usageMsg{total, free, platform.ReadSysInfo()}
 }
 
 func (m *menu) Update(msg tea.Msg) (screen, tea.Cmd) {
 	switch msg := msg.(type) {
 	case usageMsg:
-		m.total, m.free = msg.total, msg.free
+		m.total, m.free, m.sys = msg.total, msg.free, msg.sys
 	case tea.KeyPressMsg:
 		if moveList(&m.l, msg, len(m.items), len(m.items)) {
 			return m, nil
@@ -81,11 +87,13 @@ func (m *menu) Keys() []key.Binding {
 func (m *menu) View() string {
 	t, w := m.sh.theme, m.sh.w()
 	var b strings.Builder
-	b.WriteString(t.Bold.Render("lega") + "  " + t.Dim.Render(m.sh.release.DisplayName()) + "\n")
+	// Rows the menu needs below the banner: a gap, the free space line, a
+	// gap, the items, and the gap and help line at the bottom.
+	below := 3 + len(m.items) + 2
+	b.WriteString(banner(t, m.sh.release, m.sys, w, m.sh.h()-below) + "\n\n")
 	if m.total > 0 {
-		fmt.Fprintf(&b, "%s free of %s in your home disk\n", t.Accent.Render(format.Size(m.free)), format.Size(m.total))
+		fmt.Fprintf(&b, "%s free of %s in your home disk\n\n", t.Accent.Render(format.Size(m.free)), format.Size(m.total))
 	}
-	b.WriteString("\n")
 	nameW := 10
 	for i, it := range m.items {
 		marker, name := "  ", fit(it.name, nameW)
