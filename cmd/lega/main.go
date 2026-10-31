@@ -30,6 +30,8 @@ Usage:
   lega clean [flags]       remove caches, logs and other junk
   lega analyze [path]      explore a folder by size (default: home)
   lega purge [paths...]    remove build folders (node_modules, target, ...)
+  lega update [--check]    install the latest release
+  lega remove [--yes]      uninstall lega, its settings and its log
   lega version             print the version
 
 Flags for clean and purge:
@@ -69,8 +71,8 @@ func (e usageError) Error() string { return e.msg + " (see lega --help)" }
 
 // options are the flags shared by all commands.
 type options struct {
-	json, dryRun, yes, system bool
-	args                      []string
+	json, dryRun, yes, system, check bool
+	args                             []string
 }
 
 func parse(name string, args []string, stderr io.Writer) (options, error) {
@@ -87,6 +89,10 @@ func parse(name string, args []string, stderr io.Writer) (options, error) {
 		if name == "clean" {
 			fs.BoolVar(&o.system, "system", false, "include system items")
 		}
+	case "update":
+		fs.BoolVar(&o.check, "check", false, "only check")
+	case "remove":
+		fs.BoolVar(&o.yes, "yes", false, "do not ask")
 	}
 	// Allow flags after positional arguments: lega analyze ~/x --json.
 	var rest []string
@@ -117,10 +123,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		fmt.Fprint(stdout, usage)
 		return nil
 	case "-v", "--version", "version":
-		fmt.Fprintln(stdout, "lega", version)
+		fmt.Fprintln(stdout, "lega", currentVersion())
 		return nil
 	case clean.RootCommand:
 		return clean.RootMain(ctx, args, stdout)
+	case "update", "remove":
+		return runSelf(ctx, cmd, args, stdout, stderr)
 	case "menu", "status", "clean", "analyze", "purge":
 	default:
 		return usageError{fmt.Sprintf("unknown command %q", cmd)}
@@ -158,4 +166,28 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return usageError{"no terminal to draw on; use --json, --dry-run or --yes"}
 	}
 	return ui.Run(ctx, ui.Config{Env: env, Release: rel}, cmd, o.args)
+}
+
+// runSelf handles update and remove. Both may run under sudo, for a lega
+// installed in a folder the user cannot write to.
+func runSelf(ctx context.Context, cmd string, args []string, stdout, stderr io.Writer) error {
+	o, err := parse(cmd, args, stderr)
+	if err != nil {
+		return err
+	}
+	if len(o.args) > 0 {
+		return usageError{fmt.Sprintf("%s takes no arguments", cmd)}
+	}
+	if cmd == "update" {
+		return selfUpdate(ctx, o.check, stdout)
+	}
+	env, err := platform.CurrentEnv()
+	if err != nil {
+		return err
+	}
+	var confirm io.Reader
+	if term.IsTerminal(os.Stdin.Fd()) {
+		confirm = os.Stdin
+	}
+	return selfRemove(env, platform.IsRoot(), o.yes, confirm, stdout)
 }
