@@ -15,12 +15,14 @@ type Config struct {
 	Release platform.OSRelease
 }
 
-// Run starts the interface on the named screen (status, analyze, clean or
-// purge) and blocks until it quits. args are the command's arguments, such
+// Run starts the interface on the named screen (menu, status, analyze,
+// clean or purge) and blocks until it quits. args are the command's arguments, such
 // as the folder to analyze.
 func Run(ctx context.Context, cfg Config, start string, args []string) error {
 	var first func(*shared) screen
 	switch start {
+	case "menu":
+		first = newMenu
 	case "status":
 		first = newStatus
 	case "analyze":
