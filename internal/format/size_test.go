@@ -26,3 +26,12 @@ func TestSize(t *testing.T) {
 		}
 	}
 }
+
+func TestCount(t *testing.T) {
+	cases := map[int64]string{0: "0", 999: "999", 1000: "1,000", 412345: "412,345", 1234567: "1,234,567", -1500: "-1,500"}
+	for in, want := range cases {
+		if got := Count(in); got != want {
+			t.Errorf("Count(%d) = %q, want %q", in, got, want)
+		}
+	}
+}

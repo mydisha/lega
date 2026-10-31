@@ -23,3 +23,15 @@ func Size(n int64) string {
 	}
 	return fmt.Sprintf("%.1f %s", v, units[i])
 }
+
+// Count formats a number with thousands separators, like 412,345.
+func Count(n int64) string {
+	if n < 0 {
+		return "-" + Count(-n)
+	}
+	s := fmt.Sprint(n)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
