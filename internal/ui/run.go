@@ -15,15 +15,21 @@ type Config struct {
 	Release platform.OSRelease
 }
 
-// screens maps a start name to the screen it opens.
-var screens = map[string]func(*shared) screen{
-	"status": newStatus,
-}
-
-// Run starts the interface on the named screen and blocks until it quits.
-func Run(ctx context.Context, cfg Config, start string) error {
-	first, ok := screens[start]
-	if !ok {
+// Run starts the interface on the named screen ("status" or "analyze")
+// and blocks until it quits. args are the command's arguments, such as
+// the folder to analyze.
+func Run(ctx context.Context, cfg Config, start string, args []string) error {
+	var first func(*shared) screen
+	switch start {
+	case "status":
+		first = newStatus
+	case "analyze":
+		root := ""
+		if len(args) > 0 {
+			root = args[0]
+		}
+		first = newAnalyze(root)
+	default:
 		return fmt.Errorf("unknown screen %q", start)
 	}
 	sh := &shared{theme: NewTheme(true), env: cfg.Env, release: cfg.Release, ctx: ctx}
