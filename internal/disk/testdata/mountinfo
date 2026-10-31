@@ -1,0 +1,12 @@
+22 28 0:21 / /proc rw,nosuid,nodev,noexec,relatime shared:12 - proc proc rw
+25 28 0:23 / /run rw,nosuid,nodev,noexec,relatime shared:5 - tmpfs tmpfs rw,size=1621412k,mode=755
+28 1 259:2 /@ / rw,relatime shared:1 - btrfs /dev/nvme0n1p2 rw,ssd,space_cache=v2,subvol=/@
+29 28 259:2 /@home /home rw,relatime shared:2 - btrfs /dev/nvme0n1p2 rw,ssd,space_cache=v2,subvol=/@home
+30 28 259:1 / /boot/efi rw,relatime shared:3 - vfat /dev/nvme0n1p1 rw,fmask=0077,dmask=0077
+31 28 7:0 / /snap/core22/1380 ro,nodev,relatime shared:4 - squashfs /dev/loop0 ro,errors=continue
+32 28 0:45 / /tmp rw,nosuid,nodev shared:6 - tmpfs tmpfs rw
+33 28 8:17 / /media/dias/My\040Backup rw,nosuid,nodev,relatime shared:7 - exfat /dev/sdb1 rw,uid=1000
+34 28 8:33 / /mnt/data rw,relatime shared:8 - ext4 /dev/sdc1 rw
+35 28 8:33 /shared /srv/shared rw,relatime shared:8 - ext4 /dev/sdc1 rw
+36 28 0:50 / /var/lib/docker/overlay2/x/merged rw,relatime - overlay overlay rw
+garbage line without separator
