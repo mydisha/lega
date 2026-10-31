@@ -66,7 +66,7 @@ func fakeServer(t *testing.T, r *release) *httptest.Server {
 				return
 			}
 			http.Redirect(w, req, r.latest, http.StatusFound)
-		case strings.HasPrefix(req.URL.Path, "/tag/"):
+		case strings.HasPrefix(req.URL.Path, "/tag/"), req.URL.Path == "/releases":
 			w.Write([]byte("release page"))
 		case strings.HasPrefix(req.URL.Path, "/download/"+r.tag+"/"):
 			body, ok := r.files[strings.TrimPrefix(req.URL.Path, "/download/"+r.tag+"/")]
