@@ -44,17 +44,21 @@ not new hex values.
 
 ## Icons
 
-- Icons are Nerd Font glyphs and are off unless the user asks for them
-  (`--icons` or `LEGA_ICONS=nerd`). Without a Nerd Font they would draw as
-  empty boxes.
+- Icons are on by default. They are Nerd Font glyphs when fontconfig finds a
+  font with them, or the terminal ships them (Ghostty, WezTerm), and emoji
+  otherwise, so they never draw as empty boxes. The Linux console, which can
+  draw neither, gets none. `--no-icons` and `LEGA_ICONS=off|nerd|emoji`
+  override the choice.
 - An icon names the real thing: the app's own logo for a clean item
   (Firefox, VS Code, npm), the file kind for a file, the folder's purpose for
   a known folder (Downloads, `.git`, `node_modules`). Anything else gets the
   plain folder or file glyph, never a decorative one.
-- Icons are faint, and take the accent only on the cursor row, the same as the
-  name next to them.
-- Each glyph takes one cell plus a space. Rows take those two cells off the
-  name, so screens still fit 80 and 60 columns.
+- Nerd glyphs are faint, and take the accent only on the cursor row, the same
+  as the name next to them. Emoji keep their own colors.
+- Emoji are only those that draw as emoji without a variation selector or
+  joiner, so terminals agree they are two cells wide.
+- A Nerd glyph takes one cell plus a space, an emoji two cells plus a space.
+  Rows take those cells off the name, so screens still fit 80 and 60 columns.
 
 ## States
 

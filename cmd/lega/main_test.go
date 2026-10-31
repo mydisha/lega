@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/mydisha/lega/internal/ui"
 )
 
 // fakeHome points HOME and the XDG folders at a temp folder.
@@ -188,14 +190,45 @@ func TestIconsFlag(t *testing.T) {
 		}
 	}
 
-	t.Setenv("LEGA_ICONS", "")
-	if wantIcons(false) || !wantIcons(true) {
-		t.Error("icons follow --icons when LEGA_ICONS is unset")
+	o, err = parse("menu", []string{"--no-icons"}, &bytes.Buffer{})
+	if err != nil || !o.noIcons {
+		t.Errorf("got %+v, %v", o, err)
 	}
-	for val, want := range map[string]bool{"nerd": true, "1": false, "NERD ": false} {
-		t.Setenv("LEGA_ICONS", val)
-		if got := wantIcons(false); got != want {
-			t.Errorf("LEGA_ICONS=%q: icons = %v, want %v", val, got, want)
-		}
+}
+
+func TestPickIcons(t *testing.T) {
+	cases := []struct {
+		name    string
+		o       options
+		env     map[string]string
+		font    bool
+		want    ui.IconSet
+		askFont bool // the fontconfig check is needed for the answer
+	}{
+		{"nerd font installed", options{}, map[string]string{"TERM": "xterm-256color"}, true, ui.IconsNerd, true},
+		{"no nerd font falls back to emoji", options{}, map[string]string{"TERM": "xterm-256color"}, false, ui.IconsEmoji, true},
+		{"ghostty ships the symbols", options{}, map[string]string{"TERM": "xterm-ghostty"}, false, ui.IconsNerd, false},
+		{"wezterm ships the symbols", options{}, map[string]string{"TERM_PROGRAM": "WezTerm"}, false, ui.IconsNerd, false},
+		{"linux console has neither", options{}, map[string]string{"TERM": "linux"}, true, ui.IconsOff, false},
+		{"--icons on the console", options{icons: true}, map[string]string{"TERM": "linux"}, false, ui.IconsEmoji, true},
+		{"--no-icons", options{noIcons: true}, map[string]string{"LEGA_ICONS": "nerd"}, true, ui.IconsOff, false},
+		{"--no-icons beats --icons", options{icons: true, noIcons: true}, nil, true, ui.IconsOff, false},
+		{"LEGA_ICONS=nerd", options{}, map[string]string{"LEGA_ICONS": " NERD "}, false, ui.IconsNerd, false},
+		{"LEGA_ICONS=emoji", options{}, map[string]string{"LEGA_ICONS": "emoji", "TERM": "xterm-ghostty"}, true, ui.IconsEmoji, false},
+		{"LEGA_ICONS=off", options{}, map[string]string{"LEGA_ICONS": "off"}, true, ui.IconsOff, false},
+		{"--icons beats LEGA_ICONS=off", options{icons: true}, map[string]string{"LEGA_ICONS": "off"}, true, ui.IconsNerd, true},
+		{"unknown LEGA_ICONS is auto", options{}, map[string]string{"LEGA_ICONS": "ikon"}, false, ui.IconsEmoji, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			asked := false
+			got := pickIcons(c.o, func(k string) string { return c.env[k] }, func() bool { asked = true; return c.font })
+			if got != c.want {
+				t.Errorf("icons = %v, want %v", got, c.want)
+			}
+			if asked && !c.askFont {
+				t.Error("fontconfig was asked although the answer did not need it")
+			}
+		})
 	}
 }

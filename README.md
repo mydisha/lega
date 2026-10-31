@@ -168,13 +168,15 @@ CPU and memory.
 
 ### Icons
 
-lega can show icons next to folders, file types and apps (Firefox, Chrome,
-VS Code, npm, Docker and others). They need a [Nerd Font](https://www.nerdfonts.com)
-set as your terminal font, so they are off by default:
+lega shows icons next to folders, file types and apps (Firefox, Chrome,
+VS Code, npm, Docker and others). When a [Nerd Font](https://www.nerdfonts.com)
+is installed, or the terminal ships its symbols (Ghostty, WezTerm), they are
+Nerd Font glyphs; otherwise they are emoji. The Linux console gets none.
 
 ```sh
-lega --icons                          # once
-export LEGA_ICONS=nerd                # always, e.g. in ~/.bashrc
+lega --no-icons                       # hide them once
+export LEGA_ICONS=off                 # hide them always, e.g. in ~/.bashrc
+export LEGA_ICONS=emoji               # or always use emoji (or nerd)
 ```
 
 ### Keys

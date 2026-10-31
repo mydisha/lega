@@ -18,7 +18,7 @@ func TestNodeIcon(t *testing.T) {
 	cases := []struct {
 		path  string
 		isDir bool
-		want  string
+		want  glyph
 	}{
 		{home + "/Unduhan", true, icoDownload},
 		{home + "/Gambar", true, icoPictures},
@@ -42,7 +42,7 @@ func TestNodeIcon(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got := nodeIcon(c.path, c.isDir, userDirs); got != c.want {
-			t.Errorf("nodeIcon(%q, %v) = %U, want %U", c.path, c.isDir, []rune(got), []rune(c.want))
+			t.Errorf("nodeIcon(%q, %v) = %v, want %v", c.path, c.isDir, got, c.want)
 		}
 	}
 }
@@ -61,75 +61,92 @@ func TestEveryRuleHasIcon(t *testing.T) {
 	}
 }
 
-// The width math assumes each glyph is one cell; a glyph that measures
-// wider would push rows past the screen edge.
-func TestIconsAreOneCell(t *testing.T) {
-	all := []string{icoFolder, icoFile}
-	for _, g := range ruleIcons {
-		all = append(all, g)
-	}
-	for _, g := range dirIcons {
-		all = append(all, g)
-	}
-	for _, g := range extIcons {
-		all = append(all, g)
+// The width math assumes each Nerd glyph is one cell and each emoji two;
+// a glyph that measures otherwise would push rows past the screen edge.
+// Emoji must not need a variation selector or joiner, since terminals
+// disagree on how wide those draw.
+func TestGlyphWidths(t *testing.T) {
+	all := []glyph{icoFolder, icoFile}
+	for _, m := range []map[string]glyph{ruleIcons, dirIcons, extIcons, userDirIcons} {
+		for _, g := range m {
+			all = append(all, g)
+		}
 	}
 	for _, g := range all {
-		if w := ansi.StringWidth(g); w != 1 {
-			t.Errorf("%U is %d cells wide", []rune(g), w)
+		if w := ansi.StringWidth(g.nerd); w != 1 || len([]rune(g.nerd)) != 1 {
+			t.Errorf("nerd %U is %d cells wide", []rune(g.nerd), w)
+		}
+		if w := ansi.StringWidth(g.emoji); w != 2 || len([]rune(g.emoji)) != 1 {
+			t.Errorf("emoji %q (%U) is %d cells wide", g.emoji, []rune(g.emoji), w)
+		}
+		if strings.ContainsAny(g.emoji, "\ufe0f\u200d") {
+			t.Errorf("emoji %q needs a variation selector or joiner", g.emoji)
 		}
 	}
 }
 
-func TestIconsOff(t *testing.T) {
+func TestIconSets(t *testing.T) {
 	sh := testShared(t, 80)
 	if sh.icon(icoFolder, sh.theme.Dim) != "" || sh.iconWidth() != 0 {
-		t.Error("icons must stay off unless asked for")
+		t.Error("the test default is no icons")
 	}
-	sh.icons = true
-	if got := ansi.Strip(sh.icon(icoFolder, sh.theme.Dim)); got != icoFolder+" " || sh.iconWidth() != ansi.StringWidth(got) {
-		t.Errorf("icon = %q, width %d", got, sh.iconWidth())
+	for _, c := range []struct {
+		set  IconSet
+		want string
+	}{{IconsNerd, icoFolder.nerd + " "}, {IconsEmoji, icoFolder.emoji + " "}} {
+		sh.icons = c.set
+		got := ansi.Strip(sh.icon(icoFolder, sh.theme.Dim))
+		if got != c.want || sh.iconWidth() != ansi.StringWidth(got) {
+			t.Errorf("set %d: icon = %q, width %d", c.set, got, sh.iconWidth())
+		}
 	}
 }
 
-// Rows with icons on still fit the screen with very long names.
+// Rows with icons on still fit the screen with very long names, in both
+// sets.
 func TestIconRowsFit(t *testing.T) {
 	longDir := strings.Repeat("ディレクトリ-very-long-folder-name-", 4)
-	for _, w := range []int{60, 80} {
-		sh := testShared(t, w)
-		sh.icons = true
-		write(t, filepath.Join(sh.env.Home, longDir, "写真-"+strings.Repeat("x", 120)+".png"), 50_000)
-		write(t, filepath.Join(sh.env.Home, "Projects", longDir, "package.json"), 100)
-		write(t, filepath.Join(sh.env.Home, "Projects", longDir, "node_modules", "a.js"), 300_000)
-		old := time.Now().Add(-40 * 24 * time.Hour)
-		chtimesTree(t, filepath.Join(sh.env.Home, "Projects"), old)
-		junkHome(t, sh)
+	for _, set := range []IconSet{IconsNerd, IconsEmoji} {
+		for _, w := range []int{60, 80} {
+			sh := testShared(t, w)
+			sh.icons = set
+			write(t, filepath.Join(sh.env.Home, longDir, "写真-"+strings.Repeat("x", 120)+".png"), 50_000)
+			write(t, filepath.Join(sh.env.Home, "Projects", longDir, "package.json"), 100)
+			write(t, filepath.Join(sh.env.Home, "Projects", longDir, "node_modules", "a.js"), 300_000)
+			old := time.Now().Add(-40 * 24 * time.Hour)
+			chtimesTree(t, filepath.Join(sh.env.Home, "Projects"), old)
+			junkHome(t, sh)
 
-		a := startAnalyze(t, sh, "")
-		checkIconView(t, "analyze", a.View(), w, icoFolder)
-		sendKeys(a, "f")
-		checkIconView(t, "largest files", a.View(), w, icoImage)
+			a := startAnalyze(t, sh, "")
+			checkIconView(t, sh, "analyze", a.View(), icoFolder)
+			sendKeys(a, "f")
+			checkIconView(t, sh, "largest files", a.View(), icoImage)
 
-		s := newStatus(sh).(*status)
-		s = run(s, s.scanHome()).(*status)
-		checkIconView(t, "status", s.View(), w, icoFolder)
+			s := newStatus(sh).(*status)
+			s = run(s, s.scanHome()).(*status)
+			checkIconView(t, sh, "status", s.View(), icoFolder)
 
-		p := newPurger(nil)(sh)
-		p = settle(p, p.Init())
-		checkIconView(t, "purge", p.View(), w, icoNode)
+			p := newPurger(nil)(sh)
+			p = settle(p, p.Init())
+			checkIconView(t, sh, "purge", p.View(), icoNode)
 
-		c := cleanContext(t, sh)
-		m := newCleanerWith(sh, c, userRules(c))
-		m = settle(m, m.Init()).(*cleaner)
-		checkIconView(t, "clean", m.View(), w, icoFirefox)
+			c := cleanContext(t, sh)
+			m := newCleanerWith(sh, c, userRules(c))
+			m = settle(m, m.Init()).(*cleaner)
+			checkIconView(t, sh, "clean", m.View(), icoFirefox)
+		}
 	}
 }
 
-func checkIconView(t *testing.T, name, view string, w int, glyph string) {
+func checkIconView(t *testing.T, sh *shared, name, view string, g glyph) {
 	t.Helper()
-	fitsWidth(t, view, w)
-	if !strings.Contains(view, glyph) {
-		t.Errorf("%s at %d columns lacks icon %U:\n%s", name, w, []rune(glyph), ansi.Strip(view))
+	fitsWidth(t, view, sh.w())
+	want := g.nerd
+	if sh.icons == IconsEmoji {
+		want = g.emoji
+	}
+	if !strings.Contains(view, want) {
+		t.Errorf("%s (set %d, %d columns) lacks icon %q:\n%s", name, sh.icons, sh.w(), want, ansi.Strip(view))
 	}
 }
 
