@@ -30,8 +30,8 @@ type shared struct {
 	env     platform.Env
 	release platform.OSRelease
 	ctx     context.Context
-	// icons turns on Nerd Font icons next to names.
-	icons bool
+	// icons is the icon set drawn next to names.
+	icons IconSet
 	// userDirs are the XDG user folders by key, read once for the icons.
 	userDirs map[string]string
 }

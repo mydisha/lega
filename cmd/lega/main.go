@@ -44,8 +44,12 @@ Flags for status and analyze:
   --json      print JSON instead of opening the interface
 
 Flags for the interface (menu, status, clean, analyze, purge):
-  --icons     show icons next to files, folders and apps; needs a Nerd Font
-              (https://www.nerdfonts.com). LEGA_ICONS=nerd does the same.
+  --no-icons  hide the icons next to files, folders and apps
+  --icons     show them even where lega would not (the Linux console)
+
+Icons are Nerd Font glyphs when a Nerd Font is installed or the terminal
+ships one (Ghostty, WezTerm), and emoji otherwise. LEGA_ICONS=nerd, emoji
+or off picks for you.
 
 Keep files safe from clean and purge by listing them, one per line,
 in ~/.config/lega/whitelist. Every removal is logged in
@@ -76,8 +80,9 @@ func (e usageError) Error() string { return e.msg + " (see lega --help)" }
 
 // options are the flags shared by all commands.
 type options struct {
-	json, dryRun, yes, system, check, icons bool
-	args                                    []string
+	json, dryRun, yes, system, check bool
+	icons, noIcons                   bool
+	args                             []string
 }
 
 func parse(name string, args []string, stderr io.Writer) (options, error) {
@@ -87,7 +92,8 @@ func parse(name string, args []string, stderr io.Writer) (options, error) {
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
 	switch name {
 	case "menu", "status", "clean", "analyze", "purge":
-		fs.BoolVar(&o.icons, "icons", false, "show Nerd Font icons")
+		fs.BoolVar(&o.icons, "icons", false, "always show icons")
+		fs.BoolVar(&o.noIcons, "no-icons", false, "hide icons")
 	}
 	switch name {
 	case "status", "analyze":
@@ -175,13 +181,44 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if !term.IsTerminal(os.Stdout.Fd()) || !term.IsTerminal(os.Stdin.Fd()) {
 		return usageError{"no terminal to draw on; use --json, --dry-run or --yes"}
 	}
-	return ui.Run(ctx, ui.Config{Env: env, Release: rel, Icons: wantIcons(o.icons)}, cmd, o.args)
+	icons := pickIcons(o, os.Getenv, platform.NerdFontInstalled)
+	return ui.Run(ctx, ui.Config{Env: env, Release: rel, Icons: icons}, cmd, o.args)
 }
 
-// wantIcons reports whether to draw Nerd Font icons: with --icons, or when
-// LEGA_ICONS=nerd is set.
-func wantIcons(flagSet bool) bool {
-	return flagSet || os.Getenv("LEGA_ICONS") == "nerd"
+// pickIcons chooses the icon set. --no-icons turns icons off, and
+// LEGA_ICONS=nerd, emoji or off picks for the user. Otherwise lega draws
+// Nerd Font glyphs when the terminal can, emoji when it cannot, and nothing
+// on the Linux console, which can draw neither (unless --icons insists).
+// nerdFont is only asked when the answer depends on it.
+func pickIcons(o options, getenv func(string) string, nerdFont func() bool) ui.IconSet {
+	choice := strings.ToLower(strings.TrimSpace(getenv("LEGA_ICONS")))
+	switch {
+	case o.noIcons:
+		return ui.IconsOff
+	case choice == "nerd":
+		return ui.IconsNerd
+	case choice == "emoji":
+		return ui.IconsEmoji
+	case o.icons:
+	case choice == "off", choice == "none", choice == "0", choice == "false":
+		return ui.IconsOff
+	case getenv("TERM") == "linux", getenv("TERM") == "dumb":
+		return ui.IconsOff
+	}
+	if nerdTerminal(getenv) || nerdFont() {
+		return ui.IconsNerd
+	}
+	return ui.IconsEmoji
+}
+
+// nerdTerminal reports whether the terminal ships Nerd Font symbols of its
+// own, so they draw whatever fonts are installed.
+func nerdTerminal(getenv func(string) string) bool {
+	switch strings.ToLower(getenv("TERM_PROGRAM")) {
+	case "ghostty", "wezterm":
+		return true
+	}
+	return getenv("TERM") == "xterm-ghostty"
 }
 
 // isCommandFlag reports whether arg is a flag that works as a command.

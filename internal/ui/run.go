@@ -13,8 +13,8 @@ import (
 type Config struct {
 	Env     platform.Env
 	Release platform.OSRelease
-	// Icons shows Nerd Font icons next to files, folders and apps.
-	Icons bool
+	// Icons is the icon set drawn next to files, folders and apps.
+	Icons IconSet
 }
 
 // Run starts the interface on the named screen (menu, status, analyze,
@@ -41,7 +41,7 @@ func Run(ctx context.Context, cfg Config, start string, args []string) error {
 		return fmt.Errorf("unknown screen %q", start)
 	}
 	sh := &shared{theme: NewTheme(true), env: cfg.Env, release: cfg.Release, ctx: ctx, icons: cfg.Icons}
-	if cfg.Icons {
+	if cfg.Icons != IconsOff {
 		sh.userDirs = cfg.Env.UserDirs()
 	}
 	_, err := tea.NewProgram(newApp(sh, first), tea.WithContext(ctx)).Run()
