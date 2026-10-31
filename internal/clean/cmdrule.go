@@ -17,11 +17,24 @@ type commandRule struct {
 	measure   []string // folders whose size the command shrinks
 	measureFn func(ctx context.Context, c *Context) ([]Target, error)
 	cmd       []string
+	// partial means the command frees only part of what is measured, so
+	// the size is shown as "up to".
+	partial bool
 }
 
 func (r *commandRule) Info() Info { return r.info }
 
 func (r *commandRule) Scan(ctx context.Context, c *Context) ([]Target, error) {
+	out, err := r.measureAll(ctx, c)
+	if r.partial {
+		for i := range out {
+			out[i].Unknown = true
+		}
+	}
+	return out, err
+}
+
+func (r *commandRule) measureAll(ctx context.Context, c *Context) ([]Target, error) {
 	if r.measureFn != nil {
 		return r.measureFn(ctx, c)
 	}
@@ -46,7 +59,7 @@ func (r *commandRule) Clean(ctx context.Context, c *Context, targets []Target) [
 		rm.Err = err.Error()
 		return []Removal{rm}
 	}
-	if after, err := r.Scan(ctx, c); err == nil {
+	if after, err := r.measureAll(ctx, c); err == nil {
 		rm.Bytes = max(before-sum(after), 0)
 	}
 	return []Removal{rm}

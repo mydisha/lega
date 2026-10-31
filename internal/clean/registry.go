@@ -15,6 +15,9 @@ import (
 func Rules() []Rule {
 	var all []Rule
 	all = append(all, systemRules()...)
+	all = append(all, browserRules()...)
+	all = append(all, devRules()...)
+	all = append(all, appRules()...)
 	all = append(all, generalRules()...)
 	return all
 }

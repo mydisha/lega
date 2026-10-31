@@ -30,6 +30,8 @@ func testContext(t *testing.T) *Context {
 	}
 	os.MkdirAll(env.CacheDir, 0o755)
 	t.Setenv("LEGA_NO_OPLOG", "")
+	// Keep rules that read env vars inside the fake home.
+	t.Setenv("GOMODCACHE", filepath.Join(home, "go", "pkg", "mod"))
 	userDirs := []string{filepath.Join(home, "Documents"), filepath.Join(home, "Downloads")}
 	return &Context{
 		Env:      env,
