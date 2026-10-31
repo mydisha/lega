@@ -155,3 +155,40 @@ func TestBadWhitelistStopsPurge(t *testing.T) {
 		t.Errorf("want whitelist error, got %v", err)
 	}
 }
+
+func TestIconsFlag(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("lega refuses to run as root")
+	}
+	fakeHome(t)
+	var u usageError
+	// "lega --icons" opens the menu (and stops at the missing terminal)
+	// instead of failing as an unknown command.
+	for _, args := range [][]string{{"--icons"}, {"analyze", "--icons"}, {"purge", "/tmp", "--icons"}} {
+		if _, _, err := lega(args...); !errors.As(err, &u) || !strings.Contains(err.Error(), "no terminal") {
+			t.Errorf("%v: %v", args, err)
+		}
+	}
+	if _, _, err := lega("--nope"); err == nil || errors.As(err, &u) && strings.Contains(err.Error(), "no terminal") {
+		t.Errorf("unknown flag before a command: %v", err)
+	}
+	if out, _, err := lega("-v"); err != nil || out != "lega dev\n" {
+		t.Errorf("-v: %q %v", out, err)
+	}
+
+	o, err := parse("clean", []string{"--dry-run", "--icons"}, &bytes.Buffer{})
+	if err != nil || !o.icons || !o.dryRun {
+		t.Errorf("got %+v, %v", o, err)
+	}
+
+	t.Setenv("LEGA_ICONS", "")
+	if wantIcons(false) || !wantIcons(true) {
+		t.Error("icons follow --icons when LEGA_ICONS is unset")
+	}
+	for val, want := range map[string]bool{"nerd": true, "1": false, "NERD ": false} {
+		t.Setenv("LEGA_ICONS", val)
+		if got := wantIcons(false); got != want {
+			t.Errorf("LEGA_ICONS=%q: icons = %v, want %v", val, got, want)
+		}
+	}
+}

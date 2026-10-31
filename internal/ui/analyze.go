@@ -394,7 +394,7 @@ func (a *analyze) row(n *scan.Node, focused bool, w int) string {
 	if barW > 0 {
 		line += bar(t, barW, pct, fill) + "  "
 	}
-	nameW := w - lipgloss.Width(line)
+	nameW := w - lipgloss.Width(line) - a.sh.iconWidth()
 	if n.Err != nil {
 		name += " (no access)"
 	}
@@ -403,11 +403,13 @@ func (a *analyze) row(n *scan.Node, focused bool, w int) string {
 	} else {
 		name = fit(name, nameW)
 	}
+	ico := a.sh.icon(nodeIcon(n.Path(), n.IsDir, a.sh.userDirs), t.Dim)
 	switch {
 	case n.Err != nil:
 		name = t.Dim.Render(name)
 	case focused:
+		ico = a.sh.icon(nodeIcon(n.Path(), n.IsDir, a.sh.userDirs), t.Accent)
 		name = t.Accent.Render(name)
 	}
-	return line + name
+	return line + ico + name
 }

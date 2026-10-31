@@ -9,7 +9,8 @@ instead of painting over it.
   hints) uses faint text, so it follows the terminal theme too.
 - There is one accent color, orange. It marks only what the user acts on or
   looks for: the cursor row, a selected checkbox, and the key number on a
-  screen (free space, the size selected, the size freed).
+  screen (free space, the size selected, the size freed). The one exception
+  is the wordmark on the start screen, drawn once in the accent.
   - Text on a dark background: `#f5a173`
   - Text on a light background: `#a03f15`
   - Filled bar of the focused row: `#ec6a2c`
@@ -33,6 +34,24 @@ not new hex values.
   in the middle (`/home/…/node_modules`) so the start and the name stay visible.
   Bars shrink first, then disappear, before names are cut.
 - The help line with the keys for the current screen sits on the last row.
+- The start screen shows the wordmark (figlet "ANSI Shadow" style) with the
+  system summary beside it. On narrow screens the summary moves under it;
+  when the screen is too narrow or short for the wordmark, a plain bold
+  "lega" takes its place, so the menu items never scroll away.
+
+## Icons
+
+- Icons are Nerd Font glyphs and are off unless the user asks for them
+  (`--icons` or `LEGA_ICONS=nerd`). Without a Nerd Font they would draw as
+  empty boxes.
+- An icon names the real thing: the app's own logo for a clean item
+  (Firefox, VS Code, npm), the file kind for a file, the folder's purpose for
+  a known folder (Downloads, `.git`, `node_modules`). Anything else gets the
+  plain folder or file glyph, never a decorative one.
+- Icons are faint, and take the accent only on the cursor row, the same as the
+  name next to them.
+- Each glyph takes one cell plus a space. Rows take those two cells off the
+  name, so screens still fit 80 and 60 columns.
 
 ## States
 
