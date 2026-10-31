@@ -107,7 +107,7 @@ func Usage(path string) (total, used, free int64, err error) {
 	if err = syscall.Statfs(path, &st); err != nil {
 		return 0, 0, 0, err
 	}
-	bs := int64(st.Bsize)
+	bs := int64(st.Bsize) //nolint:unconvert // Bsize is int32 on 32-bit Linux
 	total = int64(st.Blocks) * bs
 	used = int64(st.Blocks-st.Bfree) * bs
 	free = int64(st.Bavail) * bs

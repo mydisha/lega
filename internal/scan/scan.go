@@ -42,7 +42,7 @@ type Scanner struct {
 	bytes  atomic.Int64
 	errors atomic.Int64
 	sem    chan struct{}
-	seen   sync.Map // hardlinked inodes already counted
+	seen   sync.Map // inodes with several links that were already counted
 }
 
 // Progress returns the files and bytes counted so far, and how many
