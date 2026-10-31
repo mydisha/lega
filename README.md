@@ -15,31 +15,9 @@ Clean caches and junk safely, see what fills your disk, and clear out old build 
 
 </div>
 
-```text
-Clean
-
-System
-▸ [x] Thumbnail cache                                                   432.0 MB
-Browsers
-  [x] Firefox cache                                                       1.4 GB
-  [-] Google Chrome cache · locked (2)                                    1.1 GB
-Developer tools
-  [x] npm cache                                                           2.6 GB
-  [x] Yarn cache                                                        406.9 MB
-  [x] pip cache                                                         766.5 MB
-  [x] Go build cache                                                      3.3 GB
-  [x] VS Code caches                                                    311.4 MB
-  [ ] Docker build cache · review                                        18.8 GB
-Apps
-  [x] Chat app caches (2)                                               750.8 MB
-Files
-  [ ] Trash · review (2)                                                  2.0 GB
-
-Image previews made by the file manager. They are made again when needed.
-Selected: 12.0 GB in 11 items
-
-space select • a all/none • → details • enter continue • q back
-```
+<p align="center">
+  <img src="docs/screenshots/menu.png" width="760" alt="The lega start screen: the LEGA wordmark beside host, OS, kernel, CPU and memory, the free space on the home disk, and a menu with Status, Clean, Analyze and Purge.">
+</p>
 
 *Lega* is Indonesian for the feeling of relief, and for a room with space to
 breathe. That is what your disk gets. The project is inspired by
@@ -57,6 +35,51 @@ breathe. That is what your disk gets. The project is inspired by
   your projects that you can rebuild any time.
 - **Stays safe.** Personal files, settings, logins and history are never
   touched. Riskier items start unselected. Every removal is logged.
+
+## A look around
+
+The screenshots below use a dark terminal theme with a Nerd Font, so the
+icons are Nerd Font glyphs (see [Icons](#icons)). lega follows your own
+terminal colors.
+
+### Clean
+
+Every item shows its size before its name, grouped by where it comes from.
+Items you should look at first start unselected and say why: **review** for
+data you may want to keep, **locked** while the app is running, **sudo** for
+system items. The line under the list tells you what the item under the
+cursor does, and the total updates as you select.
+
+<p align="center">
+  <img src="docs/screenshots/clean.png" width="680" alt="The Clean screen: items grouped under System, Browsers, Developer tools, Apps and System (needs sudo), each with a checkbox, a size and a name. Docker build cache (18.8 GB) is under the cursor and marked review. The footer reads: Selected 9.8 GB in 11 items.">
+</p>
+
+### Status
+
+Status shows how full each disk is, then scans your home folder with a live
+count of files and bytes, and ranks the folders that fill it.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/status-scanning.png" alt="Status while scanning: disk bars for / at 71% and /boot/efi at 19%, and Scanning… 3,074,131 files, 172.8 GB under Home."></td>
+    <td width="50%"><img src="docs/screenshots/status.png" alt="Status when done: the same disk bars, then the home folder at 191.5 GB in 3,825,211 files, with the ten largest folders as bars, led by www at 61.9 GB."></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>While scanning</sub></td>
+    <td align="center"><sub>Done</sub></td>
+  </tr>
+</table>
+
+### Analyze
+
+Analyze walks any folder sorted by size, with each entry's share of its
+parent. Open a folder with `→`, list the largest files with `f`, or send
+something to the Trash with `d`. Folders lega cannot read are counted in the
+header instead of failing the scan.
+
+<p align="center">
+  <img src="docs/screenshots/analyze.png" width="760" alt="The Analyze screen in ~/go: 4.6 GB in 142,802 files, sorted by size, 25 folders not readable. pkg/ takes 4.5 GB (98%) and bin/ 93.5 MB (2%).">
+</p>
 
 ## Install
 
@@ -122,28 +145,6 @@ lega purge        # remove build folders from your projects
 Run lega as your normal user. When you pick system items such as the APT
 cache or the journal, it asks for your sudo password once, right before it
 cleans them.
-
-<details>
-<summary>The analyzer</summary>
-
-```text
-Analyze  ~
-32.9 GB · 23 files · sorted by size
-
-▸    7.4 GB   23%  ████░░░░░░░░░░░░  Videos/
-     7.2 GB   22%  ███░░░░░░░░░░░░░  .cache/
-     6.2 GB   19%  ███░░░░░░░░░░░░░  Downloads/
-     3.5 GB   11%  ██░░░░░░░░░░░░░░  Pictures/
-     2.7 GB    8%  █░░░░░░░░░░░░░░░  Projects/
-     2.6 GB    8%  █░░░░░░░░░░░░░░░  .npm/
-     2.0 GB    6%  █░░░░░░░░░░░░░░░  .local/
-     1.3 GB    4%  █░░░░░░░░░░░░░░░  .config/
-    42.0 MB    0%  █░░░░░░░░░░░░░░░  Documents/
-
-→ open • ← up • s sort • f largest files • d trash • o show in Files • q back
-```
-
-</details>
 
 <details>
 <summary>Purge</summary>
