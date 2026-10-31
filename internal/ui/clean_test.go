@@ -262,3 +262,57 @@ func TestCleanBadWhitelist(t *testing.T) {
 		t.Errorf("view:\n%s", ansi.Strip(m.View()))
 	}
 }
+
+// On a wide terminal the size must sit next to the name it belongs to, not
+// at the far edge of the screen.
+func TestCleanSizeNextToName(t *testing.T) {
+	sh := testShared(t, 200)
+	junkHome(t, sh)
+	c := cleanContext(t, sh)
+	m := newCleanerWith(sh, c, userRules(c))
+	m = settle(m, m.Init()).(*cleaner)
+
+	for _, name := range []string{"Thumbnail cache", "pip cache", "Other app caches"} {
+		line := lineWith(t, ansi.Strip(m.View()), name)
+		size := strings.Fields(line[:strings.Index(line, name)])
+		if len(size) < 2 || !strings.HasSuffix(size[len(size)-1], "B") {
+			t.Errorf("%s: size should come right before the name: %q", name, line)
+		}
+		if n := len(strings.TrimRight(line, " ")); n > 60 {
+			t.Errorf("%s: row is %d cells wide on a 200-cell screen, size drifted away: %q", name, n, line)
+		}
+	}
+}
+
+// Long and unicode paths in an expanded rule are cut, never pushing the
+// size off the row.
+func TestCleanLongTargets(t *testing.T) {
+	for _, w := range []int{60, 80} {
+		sh := testShared(t, w)
+		long := filepath.Join(sh.env.CacheDir, strings.Repeat("very-long-folder-name-", 6)+"日本語のキャッシュ")
+		write(t, filepath.Join(long, "blob"), 100_000)
+		c := cleanContext(t, sh)
+		m := newCleanerWith(sh, c, userRules(c))
+		m = settle(m, m.Init()).(*cleaner)
+		for m.rows[m.l.cursor].f < 0 || m.found[m.rows[m.l.cursor].f].Rule.Info().ID != "app-caches" {
+			sendKeys(m, "down")
+		}
+		sendKeys(m, "right")
+		fitsWidth(t, m.View(), w)
+		line := lineWith(t, ansi.Strip(m.View()), "…")
+		if !strings.Contains(line, " kB  ") || !strings.Contains(line, "キャッシュ") {
+			t.Errorf("width %d: target row should keep its size and the folder name: %q", w, line)
+		}
+	}
+}
+
+func lineWith(t *testing.T, view, s string) string {
+	t.Helper()
+	for _, l := range strings.Split(view, "\n") {
+		if strings.Contains(l, s) {
+			return l
+		}
+	}
+	t.Fatalf("no line with %q:\n%s", s, view)
+	return ""
+}

@@ -482,7 +482,9 @@ func (m *cleaner) rowView(r row, focused bool, w int) string {
 	if focused {
 		marker = t.Accent.Render("▸ ")
 	}
-	sizeW := 12
+	// The size comes before the name, as on the other screens, so it stays
+	// next to what it measures however wide the terminal is.
+	sizeW := len("size unknown")
 	if r.target >= 0 {
 		tg := f.Targets[r.target]
 		on := m.sel[r.f][r.target]
@@ -494,8 +496,8 @@ func (m *cleaner) rowView(r row, focused bool, w int) string {
 		if !tg.Unknown {
 			size = format.Size(tg.Bytes)
 		}
-		nameW := w - 2 - 4 - 4 - sizeW
-		return marker + "    " + box + " " + fitMiddle(tilde(m.sh.env.Home, tg.Path), nameW) + right(size, sizeW)
+		nameW := w - 2 - 4 - 4 - sizeW - 2
+		return marker + "    " + box + " " + right(size, sizeW) + "  " + fitMiddle(tilde(m.sh.env.Home, tg.Path), nameW)
 	}
 
 	info := f.Rule.Info()
@@ -520,7 +522,7 @@ func (m *cleaner) rowView(r row, focused bool, w int) string {
 	if f.Err != nil {
 		size = "error"
 	}
-	nameW := w - 2 - 4 - sizeW - 1 - m.sh.iconWidth()
+	nameW := w - 2 - 4 - sizeW - 2 - m.sh.iconWidth()
 	label := name
 	if tag != "" {
 		label += t.Dim.Render(" · " + tag)
@@ -534,7 +536,7 @@ func (m *cleaner) rowView(r row, focused bool, w int) string {
 		icoStyle = t.Accent
 	}
 	ico := m.sh.icon(ruleIcon(info.ID), icoStyle)
-	return marker + checkbox(t, anyTrue(m.sel[r.f]), !m.usable(r.f)) + " " + ico + fit(label, nameW) + right(size, sizeW+1)
+	return marker + checkbox(t, anyTrue(m.sel[r.f]), !m.usable(r.f)) + " " + right(size, sizeW) + "  " + ico + fit(label, nameW)
 }
 
 func (m *cleaner) viewConfirm(b *strings.Builder, w int) {
@@ -547,7 +549,7 @@ func (m *cleaner) viewConfirm(b *strings.Builder, w int) {
 			continue
 		}
 		_, sel := countSel(m.sel[i], f.Targets)
-		b.WriteString("  " + fit(f.Rule.Info().Name, w-16) + right(format.Size(sel), 14) + "\n")
+		b.WriteString("  " + right(format.Size(sel), 9) + "  " + fit(f.Rule.Info().Name, w-13) + "\n")
 		root = root || f.Rule.Info().NeedsRoot
 	}
 	b.WriteString("\n" + t.Dim.Render("Files are deleted for good, not moved to the Trash.") + "\n")
