@@ -88,7 +88,7 @@ func TestThumbnailsScanAndClean(t *testing.T) {
 	keep := filepath.Join(c.Env.Home, "Documents", "photo.png")
 	write(t, keep, 8000)
 
-	found := Scan(context.Background(), c, Rules(), nil)
+	found := Scan(context.Background(), c, userRules(), nil)
 	f := findingFor(found, "thumbnails")
 	if f == nil || len(f.Targets) != 2 || f.Bytes <= 0 {
 		t.Fatalf("thumbnails finding: %+v", f)
@@ -120,7 +120,7 @@ func TestWhitelistedPathsAreNotFound(t *testing.T) {
 	write(t, filepath.Join(c.Env.CacheDir, "junk", "y"), 100)
 	c.Guard.Whitelist = []string{keep}
 
-	f := findingFor(Scan(context.Background(), c, Rules(), nil), "app-caches")
+	f := findingFor(Scan(context.Background(), c, userRules(), nil), "app-caches")
 	if f == nil {
 		t.Fatal("app-caches should find the junk folder")
 	}
@@ -165,7 +165,7 @@ func TestOldInstallers(t *testing.T) {
 	os.Chtimes(old, past, past)
 	os.Chtimes(filepath.Join(dl, "folder.iso"), past, past)
 
-	f := findingFor(Scan(context.Background(), c, Rules(), nil), "old-installers")
+	f := findingFor(Scan(context.Background(), c, userRules(), nil), "old-installers")
 	if f == nil || !slices.Equal(paths(f.Targets), []string{old}) {
 		t.Fatalf("want only the old .deb, got %+v", f)
 	}
@@ -180,7 +180,7 @@ func TestTrashRule(t *testing.T) {
 	write(t, filepath.Join(trash, "files", "old.txt"), 3000)
 	write(t, filepath.Join(trash, "info", "old.txt.trashinfo"), 50)
 
-	f := findingFor(Scan(context.Background(), c, Rules(), nil), "trash")
+	f := findingFor(Scan(context.Background(), c, userRules(), nil), "trash")
 	if f == nil || len(f.Targets) != 2 {
 		t.Fatalf("trash finding %+v", f)
 	}
@@ -292,3 +292,14 @@ func TestRuleIDsUnique(t *testing.T) {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+// userRules leaves out root rules, which read real system folders.
+func userRules() []Rule {
+	var out []Rule
+	for _, r := range Rules() {
+		if !r.Info().NeedsRoot {
+			out = append(out, r)
+		}
+	}
+	return out
+}

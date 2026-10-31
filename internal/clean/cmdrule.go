@@ -20,12 +20,21 @@ type commandRule struct {
 	// partial means the command frees only part of what is measured, so
 	// the size is shown as "up to".
 	partial bool
+	// hideSize means the measurement says nothing about what will be
+	// freed; it is only used to report the result after cleaning.
+	hideSize bool
 }
 
 func (r *commandRule) Info() Info { return r.info }
 
 func (r *commandRule) Scan(ctx context.Context, c *Context) ([]Target, error) {
 	out, err := r.measureAll(ctx, c)
+	if r.hideSize {
+		if len(out) == 0 {
+			return nil, err
+		}
+		return []Target{{Path: r.info.Name, Unknown: true}}, err
+	}
 	if r.partial {
 		for i := range out {
 			out[i].Unknown = true
@@ -52,8 +61,9 @@ func (r *commandRule) measureAll(ctx context.Context, c *Context) ([]Target, err
 	return out, nil
 }
 
-func (r *commandRule) Clean(ctx context.Context, c *Context, targets []Target) []Removal {
-	before := sum(targets)
+func (r *commandRule) Clean(ctx context.Context, c *Context, _ []Target) []Removal {
+	measured, _ := r.measureAll(ctx, c)
+	before := sum(measured)
 	rm := Removal{Path: strings.Join(r.cmd, " ")}
 	if _, err := c.Run(ctx, r.cmd[0], r.cmd[1:]...); err != nil {
 		rm.Err = err.Error()

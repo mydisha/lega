@@ -27,7 +27,7 @@ func TestChromeKeepsProfileData(t *testing.T) {
 		write(t, k, 100)
 	}
 
-	f := findingFor(Scan(context.Background(), c, Rules(), nil), "chrome")
+	f := findingFor(Scan(context.Background(), c, userRules(), nil), "chrome")
 	if f == nil || len(f.Targets) != 4 {
 		t.Fatalf("chrome finding: %+v", f)
 	}
@@ -51,7 +51,7 @@ func TestFirefoxSnapAndDeb(t *testing.T) {
 	profile := filepath.Join(c.Env.Home, ".mozilla", "firefox", "abc.default", "places.sqlite")
 	write(t, profile, 100)
 
-	found := Scan(context.Background(), c, Rules(), nil)
+	found := Scan(context.Background(), c, userRules(), nil)
 	f := findingFor(found, "firefox")
 	if f == nil || !slices.Equal(paths(f.Targets), []string{deb, snap}) {
 		t.Fatalf("firefox finding: %+v", f)
@@ -73,7 +73,7 @@ func TestVSCodeKeepsSettings(t *testing.T) {
 	settings := filepath.Join(code, "User", "settings.json")
 	write(t, settings, 100)
 
-	f := findingFor(Scan(context.Background(), c, Rules(), nil), "vscode")
+	f := findingFor(Scan(context.Background(), c, userRules(), nil), "vscode")
 	if f == nil || len(f.Targets) != 2 {
 		t.Fatalf("vscode finding: %+v", f)
 	}
@@ -87,7 +87,7 @@ func TestPartialCommandShowsUpTo(t *testing.T) {
 	c := testContext(t)
 	write(t, filepath.Join(c.Env.DataDir, "pnpm", "store", "v3", "files", "a"), 9000)
 	c.LookPath = func(string) (string, error) { return "/usr/bin/pnpm", nil }
-	f := findingFor(Scan(context.Background(), c, Available(c, Rules()), nil), "pnpm")
+	f := findingFor(Scan(context.Background(), c, Available(c, userRules()), nil), "pnpm")
 	if f == nil || !f.Unknown || f.Bytes <= 0 {
 		t.Fatalf("pnpm should report an upper bound: %+v", f)
 	}

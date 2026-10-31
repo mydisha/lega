@@ -18,6 +18,7 @@ func Rules() []Rule {
 	all = append(all, browserRules()...)
 	all = append(all, devRules()...)
 	all = append(all, appRules()...)
+	all = append(all, rootRules()...)
 	all = append(all, generalRules()...)
 	return all
 }
