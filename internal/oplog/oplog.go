@@ -14,7 +14,7 @@ import (
 // Entry is one removal.
 type Entry struct {
 	Time   time.Time
-	Action string // clean, purge, trash or command
+	Action string // clean, purge or trash
 	Rule   string // rule ID, empty for manual actions
 	Path   string // file path, or the command that ran
 	Bytes  int64
