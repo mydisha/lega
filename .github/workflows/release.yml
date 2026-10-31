@@ -30,6 +30,7 @@ jobs:
   tag:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       actions: read
@@ -44,16 +45,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Check that CI passed on this commit
+      # Started right after a merge, CI may still be running: wait for it.
+      - name: Wait for CI to pass on this commit
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          result=$(gh run list -R "$GITHUB_REPOSITORY" --workflow CI --commit "$GITHUB_SHA" --limit 1 \
-            --json status,conclusion --jq '.[] | "\(.status) \(.conclusion)"')
-          if [ "$result" != "completed success" ]; then
-            echo "::error::CI has not passed on ${GITHUB_SHA::7} (got: ${result:-no run}). Wait for it or fix it, then run this again."
-            exit 1
-          fi
+        run: scripts/wait-ci.sh "$GITHUB_SHA" "$GITHUB_REPOSITORY"
       - name: Pick the version
         id: next
         env:
