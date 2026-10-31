@@ -303,3 +303,13 @@ func userRules() []Rule {
 	}
 	return out
 }
+
+func TestPickable(t *testing.T) {
+	cases := map[string]bool{"thumbnails": true, "go-mod": false, "rotated-logs": false, "snap-revisions": false}
+	for id, want := range cases {
+		r, _ := Lookup(id)
+		if got := (Finding{Rule: r}).Pickable(); got != want {
+			t.Errorf("%s pickable = %v, want %v", id, got, want)
+		}
+	}
+}

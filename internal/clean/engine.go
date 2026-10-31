@@ -156,3 +156,10 @@ func (rep *Report) add(r Removal) {
 	rep.Freed += r.Bytes
 	rep.Removed++
 }
+
+// Pickable reports whether the user may choose single targets of this
+// finding. Commands and root rules always work on all their targets.
+func (f Finding) Pickable() bool {
+	_, ok := f.Rule.(*pathRule)
+	return ok && !f.Rule.Info().NeedsRoot
+}
