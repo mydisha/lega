@@ -1,0 +1,5 @@
+PRETTY_NAME="elementary OS 8 Circe"
+NAME="elementary OS"
+VERSION_ID="8"
+ID=elementary
+ID_LIKE=ubuntu

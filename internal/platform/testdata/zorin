@@ -1,0 +1,6 @@
+PRETTY_NAME="Zorin OS 18.1"
+NAME="Zorin OS"
+VERSION_ID="18"
+VERSION="18.1"
+ID=zorin
+ID_LIKE="ubuntu debian"
