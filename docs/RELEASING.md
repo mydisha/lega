@@ -22,7 +22,8 @@ For a test build, give an exact pre-release version instead, such as
 ## Release
 
 Before you start, make sure everything you want in the release is merged into
-`main` and CI on `main` is green.
+`main`. You can start right after merging: the release waits for CI on that
+commit to finish (up to 30 minutes) and stops if CI fails.
 
 ### From GitHub (easiest)
 
@@ -44,8 +45,8 @@ git pull
 make release BUMP=minor        # or: make release TAG=v1.0.0-rc.1
 ```
 
-The script checks that `main` is clean, matches GitHub and has passed CI,
-runs the tests, shows the release notes and asks before it pushes the tag.
+The script checks that `main` is clean and matches GitHub, waits for CI on
+it to pass, runs the tests, shows the release notes and asks before it pushes the tag.
 Add `--dry-run` to `scripts/release.sh` to run the checks only.
 
 ## What happens next
@@ -85,8 +86,8 @@ reads better in the notes than `fix: handle edge case`.
 
 ## When something goes wrong
 
-- **CI has not passed**: wait for the CI run on `main` to finish, or fix it,
-  then start again. Nothing was tagged.
+- **CI failed**: the release stops before tagging and links the failed run.
+  Fix it on `main`, then start again. Nothing was tagged.
 - **The workflow failed after tagging**: fix the cause on `main`, then delete
   the tag and the draft release if one was made, and release again:
 

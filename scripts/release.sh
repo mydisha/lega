@@ -48,10 +48,7 @@ version=$(scripts/next-version.sh "$want")
 sha=$(git rev-parse HEAD)
 if [ "${RELEASE_SKIP_CI:-0}" != 1 ]; then
 	command -v gh >/dev/null 2>&1 || die "gh is needed to check CI (or set RELEASE_SKIP_CI=1)"
-	result=$(gh run list -R "$repo" --workflow CI --commit "$sha" --limit 1 \
-		--json status,conclusion --jq '.[] | "\(.status) \(.conclusion)"' 2>/dev/null || true)
-	[ "$result" = "completed success" ] ||
-		die "CI has not passed on ${sha:0:7} (got: ${result:-no run}); see https://github.com/$repo/actions"
+	scripts/wait-ci.sh "$sha" "$repo"
 fi
 
 go vet ./...
