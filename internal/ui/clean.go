@@ -500,7 +500,7 @@ func (m *cleaner) rowView(r row, focused bool, w int) string {
 	if f.Err != nil {
 		size = "error"
 	}
-	nameW := w - 2 - 4 - sizeW - 1
+	nameW := w - 2 - 4 - sizeW - 1 - m.sh.iconWidth()
 	label := name
 	if tag != "" {
 		label += t.Dim.Render(" · " + tag)
@@ -508,10 +508,13 @@ func (m *cleaner) rowView(r row, focused bool, w int) string {
 	if len(f.Targets) > 1 {
 		label += t.Dim.Render(fmt.Sprintf(" (%d)", len(f.Targets)))
 	}
+	icoStyle := t.Dim
 	if focused {
 		label = t.Accent.Render(name) + strings.TrimPrefix(label, name)
+		icoStyle = t.Accent
 	}
-	return marker + checkbox(t, anyTrue(m.sel[r.f]), !m.usable(r.f)) + " " + fit(label, nameW) + right(size, sizeW+1)
+	ico := m.sh.icon(ruleIcon(info.ID), icoStyle)
+	return marker + checkbox(t, anyTrue(m.sel[r.f]), !m.usable(r.f)) + " " + ico + fit(label, nameW) + right(size, sizeW+1)
 }
 
 func (m *cleaner) viewConfirm(b *strings.Builder, w int) {

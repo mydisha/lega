@@ -201,7 +201,8 @@ func (s *status) homeRows(w int) string {
 		}
 		size := right(format.Size(n.Size), 9)
 		barW := min(w-2-nameW-2-9-2, 30)
-		line := "  " + fit(n.Name, nameW) + "  "
+		ico := s.sh.icon(nodeIcon(n.Path(), n.IsDir, s.sh.userDirs), t.Dim)
+		line := "  " + ico + fit(n.Name, nameW-s.sh.iconWidth()) + "  "
 		if barW >= 6 {
 			line += bar(t, barW, frac, lipgloss.NewStyle()) + "  "
 		}

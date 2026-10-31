@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/charmbracelet/x/term"
@@ -42,6 +43,10 @@ Flags for clean and purge:
 Flags for status and analyze:
   --json      print JSON instead of opening the interface
 
+Flags for the interface (menu, status, clean, analyze, purge):
+  --icons     show icons next to files, folders and apps; needs a Nerd Font
+              (https://www.nerdfonts.com). LEGA_ICONS=nerd does the same.
+
 Keep files safe from clean and purge by listing them, one per line,
 in ~/.config/lega/whitelist. Every removal is logged in
 ~/.local/state/lega/operations.log.
@@ -71,8 +76,8 @@ func (e usageError) Error() string { return e.msg + " (see lega --help)" }
 
 // options are the flags shared by all commands.
 type options struct {
-	json, dryRun, yes, system, check bool
-	args                             []string
+	json, dryRun, yes, system, check, icons bool
+	args                                    []string
 }
 
 func parse(name string, args []string, stderr io.Writer) (options, error) {
@@ -80,6 +85,10 @@ func parse(name string, args []string, stderr io.Writer) (options, error) {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprint(stderr, usage) }
+	switch name {
+	case "menu", "status", "clean", "analyze", "purge":
+		fs.BoolVar(&o.icons, "icons", false, "show Nerd Font icons")
+	}
 	switch name {
 	case "status", "analyze":
 		fs.BoolVar(&o.json, "json", false, "print JSON")
@@ -115,7 +124,8 @@ func parse(name string, args []string, stderr io.Writer) (options, error) {
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	cmd := "menu"
-	if len(args) > 0 {
+	// "lega --icons" opens the menu; other words and -h/-v are commands.
+	if len(args) > 0 && (!strings.HasPrefix(args[0], "-") || isCommandFlag(args[0])) {
 		cmd, args = args[0], args[1:]
 	}
 	switch cmd {
@@ -165,7 +175,22 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if !term.IsTerminal(os.Stdout.Fd()) || !term.IsTerminal(os.Stdin.Fd()) {
 		return usageError{"no terminal to draw on; use --json, --dry-run or --yes"}
 	}
-	return ui.Run(ctx, ui.Config{Env: env, Release: rel}, cmd, o.args)
+	return ui.Run(ctx, ui.Config{Env: env, Release: rel, Icons: wantIcons(o.icons)}, cmd, o.args)
+}
+
+// wantIcons reports whether to draw Nerd Font icons: with --icons, or when
+// LEGA_ICONS=nerd is set.
+func wantIcons(flagSet bool) bool {
+	return flagSet || os.Getenv("LEGA_ICONS") == "nerd"
+}
+
+// isCommandFlag reports whether arg is a flag that works as a command.
+func isCommandFlag(arg string) bool {
+	switch arg {
+	case "-h", "--help", "-v", "--version":
+		return true
+	}
+	return false
 }
 
 // runSelf handles update and remove. Both may run under sudo, for a lega
