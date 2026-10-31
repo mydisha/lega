@@ -29,6 +29,9 @@ not new hex values.
 - Screen titles are bold, in sentence case. Labels are never uppercase.
 - Sizes use decimal units (kB, MB, GB), the same as GNOME Files and Disks, and
   are right-aligned so they line up.
+- In a list, the size column comes before the name it measures, never at the
+  far right edge. On a wide terminal a size at the edge drifts away from its
+  name and the eye cannot tell which row it belongs to.
 - Bars use `█` for the filled part and a faint `░` for the rest.
 - Every screen fits 80 columns and still works at 60. Long paths are shortened
   in the middle (`/home/…/node_modules`) so the start and the name stay visible.
