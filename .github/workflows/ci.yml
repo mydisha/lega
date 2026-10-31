@@ -43,10 +43,12 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Write release notes
+        run: scripts/release-notes.sh | tee "$RUNNER_TEMP/notes.md"
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
-          args: release --snapshot --clean
+          args: release --snapshot --clean --release-notes ${{ runner.temp }}/notes.md
       - name: Check release files
         run: |
           ls -l dist
