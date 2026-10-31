@@ -1,0 +1,24 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - misspell
+    - unconvert
+  settings:
+    errcheck:
+      exclude-functions:
+        # The operations log is best effort; a failed write must not stop a clean.
+        - (*github.com/mydisha/lega/internal/oplog.Log).Write
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      # Tests set up fixtures with plain os calls; a failure there shows up
+      # in the assertions that follow.
+      - path: _test\.go
+        linters: [errcheck]
+
+formatters:
+  enable:
+    - gofmt

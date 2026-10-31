@@ -1,0 +1,39 @@
+version: 2
+
+project_name: lega
+
+builds:
+  - main: ./cmd/lega
+    binary: lega
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md]
+
+nfpms:
+  - package_name: lega
+    homepage: https://github.com/mydisha/lega
+    maintainer: Dias Taufik Rahman <diastaufik@gmail.com>
+    description: Free up disk space on Ubuntu and its derivatives from an interactive terminal UI.
+    license: MIT
+    section: utils
+    formats: [deb]
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/lega/copyright
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^ci:", "^chore:"]
