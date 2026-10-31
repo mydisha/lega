@@ -30,3 +30,29 @@ jobs:
       - uses: golangci/golangci-lint-action@v8
         with:
           version: v2.15.0
+      - run: shellcheck install.sh scripts/*.sh
+
+  # Builds the release files without publishing, so a broken
+  # .goreleaser.yaml shows up before a tag is pushed.
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean
+      - name: Check release files
+        run: |
+          ls -l dist
+          for f in lega_linux_amd64.tar.gz lega_linux_arm64.tar.gz SHA256SUMS; do
+            test -s "dist/$f" || { echo "missing dist/$f"; exit 1; }
+          done
+          tar -tzf dist/lega_linux_amd64.tar.gz | grep -qx lega
+          (cd dist && sha256sum -c --ignore-missing SHA256SUMS)
+          dpkg-deb -c dist/*_amd64.deb | grep -q ' ./usr/bin/lega$'
