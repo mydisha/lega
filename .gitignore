@@ -1,0 +1,13 @@
+# Build output
+/lega
+/dist/
+
+# Test and coverage files
+*.test
+*.out
+coverage.*
+
+# Editor files
+.idea/
+.vscode/
+*.swp
