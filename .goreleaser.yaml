@@ -15,7 +15,8 @@ builds:
 
 archives:
   - formats: [tar.gz]
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # No version in the name, so every release has the same download URLs.
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     files: [LICENSE, README.md]
 
 nfpms:
@@ -31,7 +32,7 @@ nfpms:
         dst: /usr/share/doc/lega/copyright
 
 checksum:
-  name_template: checksums.txt
+  name_template: SHA256SUMS
 
 changelog:
   sort: asc
