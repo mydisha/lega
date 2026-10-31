@@ -8,9 +8,9 @@ Ubuntu-based distros are all welcome.
 You need Go 1.26 or newer.
 
 ```sh
-go test -race ./...
-go vet ./...
-go build -o lega ./cmd/lega
+make test    # go vet and go test -race
+make build   # ./lega, with the version from git
+make lint    # golangci-lint and shellcheck, if you have them
 ```
 
 To try the interface without touching your real files, point it at a fake home:
@@ -33,6 +33,7 @@ HOME=/tmp/fakehome ./lega clean
 | `internal/trash` | Moves files to the desktop Trash |
 | `internal/oplog` | The operations log |
 | `internal/platform` | Distro, user folders and running processes |
+| `internal/update` | `lega update`, and the release layout `install.sh` relies on |
 | `internal/ui` | The terminal interface |
 
 ## Adding a cleaning rule
@@ -81,3 +82,19 @@ put your rule before `generalRules()` so it wins the overlap.
 - Keep one change per commit, in an order that builds and passes tests at
   every step.
 - In the pull request, say which distro and version you tested on.
+
+## Releasing
+
+Maintainers cut a release from an up-to-date `main` whose CI is green:
+
+```sh
+make release TAG=v0.2.0
+```
+
+`scripts/release.sh` checks the branch, the working tree, the CI status of
+the commit and the tests, then pushes the tag. The Release workflow builds
+the tarballs, the `.deb` and `SHA256SUMS`, attests them and publishes the
+release. `install.sh` and `lega update` pick it up from there.
+
+Tags follow [Semantic Versioning](https://semver.org). Try the checks first
+with `scripts/release.sh v0.2.0 --dry-run`.
