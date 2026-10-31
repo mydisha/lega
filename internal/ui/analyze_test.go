@@ -60,6 +60,34 @@ func TestAnalyzeBrowse(t *testing.T) {
 	}
 }
 
+func TestAnalyzeHeaderShortensHome(t *testing.T) {
+	header := func(s screen) string {
+		line, _, _ := strings.Cut(ansi.Strip(s.View()), "\n")
+		return strings.TrimSpace(line)
+	}
+	sh := testShared(t, 80)
+	homeTree(t, sh)
+	a := startAnalyze(t, sh, "")
+	if got := header(a); got != "Analyze  ~" {
+		t.Errorf("home header = %q", got)
+	}
+	sendKeys(a, "enter")
+	if got := header(a); got != "Analyze  ~/media" {
+		t.Errorf("subfolder header = %q", got)
+	}
+
+	// A folder outside home keeps its full path.
+	other := t.TempDir()
+	write(t, filepath.Join(other, "x"), 10)
+	if got := header(startAnalyze(t, sh, other)); got != "Analyze  "+other {
+		t.Errorf("outside home header = %q", got)
+	}
+	// The header shown while scanning is shortened too.
+	if got := header(newAnalyze("")(sh)); got != "Analyze  ~" {
+		t.Errorf("scanning header = %q", got)
+	}
+}
+
 func TestAnalyzeLargestFiles(t *testing.T) {
 	sh := testShared(t, 60)
 	homeTree(t, sh)

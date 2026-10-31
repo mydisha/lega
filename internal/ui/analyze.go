@@ -317,11 +317,11 @@ func (a *analyze) View() string {
 
 	switch {
 	case a.err != nil:
-		b.WriteString(t.Bold.Render("Analyze") + "  " + t.Dim.Render(a.root) + "\n\n")
+		b.WriteString(t.Bold.Render("Analyze") + "  " + t.Dim.Render(fitMiddle(tilde(a.sh.env.Home, a.root), max(w-9, 10))) + "\n\n")
 		b.WriteString("  " + t.Danger.Render("Cannot scan: "+a.err.Error()) + "\n")
 		return b.String()
 	case a.scanning():
-		b.WriteString(t.Bold.Render("Analyze") + "  " + t.Dim.Render(a.root) + "\n\n")
+		b.WriteString(t.Bold.Render("Analyze") + "  " + t.Dim.Render(fitMiddle(tilde(a.sh.env.Home, a.root), max(w-9, 10))) + "\n\n")
 		files, bytes, _ := a.scanner.Progress()
 		fmt.Fprintf(&b, "  %s %s\n", a.spin.View(), t.Dim.Render(fmt.Sprintf("Scanning… %s files, %s", format.Count(files), format.Size(bytes))))
 		return b.String()
@@ -331,7 +331,7 @@ func (a *analyze) View() string {
 	if a.filesView {
 		title = "Largest files in"
 	}
-	b.WriteString(t.Bold.Render(title) + "  " + fitMiddle(a.cur.Path(), max(w-lipgloss.Width(title)-2, 10)) + "\n")
+	b.WriteString(t.Bold.Render(title) + "  " + fitMiddle(tilde(a.sh.env.Home, a.cur.Path()), max(w-lipgloss.Width(title)-2, 10)) + "\n")
 	info := fmt.Sprintf("%s · %s files", format.Size(a.cur.Size), format.Count(a.cur.Files))
 	if !a.filesView {
 		info += " · sorted by " + sortNames[a.sortBy]
