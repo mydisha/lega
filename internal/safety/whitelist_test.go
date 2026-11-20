@@ -41,6 +41,11 @@ func TestLoadWhitelistErrors(t *testing.T) {
 		t.Error("bad glob should fail")
 	}
 
+	os.WriteFile(file, []byte("/bad/\x00null\n"), 0o644)
+	if _, err := LoadWhitelist(file, "/home/u"); err == nil {
+		t.Error("control characters should fail")
+	}
+
 	if os.Geteuid() != 0 {
 		os.WriteFile(file, []byte("/ok\n"), 0o644)
 		os.Chmod(file, 0)

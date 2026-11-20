@@ -31,6 +31,9 @@ func LoadWhitelist(file, home string) ([]string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+		if hasControl(line) {
+			return nil, fmt.Errorf("whitelist line %d: invalid characters", n)
+		}
 		if line == "~" || strings.HasPrefix(line, "~/") {
 			line = filepath.Join(home, strings.TrimPrefix(line, "~"))
 		}

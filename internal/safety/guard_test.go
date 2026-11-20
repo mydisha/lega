@@ -166,3 +166,89 @@ func TestRemoveRefusesBlocked(t *testing.T) {
 		t.Error("blocked file was deleted")
 	}
 }
+
+func TestCheckControlCharsAndEmpty(t *testing.T) {
+	f := setup(t)
+	for _, p := range []string{"", f.cache + "/a\nb", f.cache + "/a\x00b", f.cache + "/a\tb", f.cache + "/a\x7fb"} {
+		blocked(t, f.g.Check(p, []string{f.cache}))
+	}
+}
+
+func TestNestedSecretAndWhitelistBlocked(t *testing.T) {
+	f := setup(t)
+	// Secret nested inside a directory inside home (e.g. .docker/config.json).
+	dockerCfg := filepath.Join(f.home, ".docker", "config.json")
+	touch(t, dockerCfg)
+	blocked(t, f.g.Check(filepath.Join(f.home, ".docker"), []string{f.home}))
+	blocked(t, f.g.Check(dockerCfg, []string{f.home}))
+
+	// Whitelisted path nested inside a directory targeted for deletion.
+	parent := filepath.Join(f.cache, "app")
+	keep := filepath.Join(parent, "sub", "keep.dat")
+	touch(t, keep)
+	touch(t, filepath.Join(parent, "junk.tmp"))
+	f.g.Whitelist = []string{keep}
+
+	if err := f.g.Remove(parent, []string{f.cache}); !errors.Is(err, ErrWhitelisted) {
+		t.Fatalf("removing parent of whitelisted file should return ErrWhitelisted, got %v", err)
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Error("nested whitelisted file was removed")
+	}
+
+	// Whitelisted glob nested inside a directory targeted for deletion.
+	f.g.Whitelist = []string{filepath.Join(parent, "*.keep")}
+	if err := f.g.Check(parent, []string{f.cache}); !errors.Is(err, ErrWhitelisted) {
+		t.Fatalf("parent of whitelisted glob should return ErrWhitelisted, got %v", err)
+	}
+}
+
+func TestSafeRecursiveRemoveKeepsSymlinkTargets(t *testing.T) {
+	f := setup(t)
+	outsideFile := filepath.Join(f.outside, "important.txt")
+	touch(t, outsideFile)
+
+	dir := filepath.Join(f.cache, "deep")
+	touch(t, filepath.Join(dir, "a", "b", "c.txt"))
+	if err := os.Symlink(f.outside, filepath.Join(dir, "a", "escape")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outsideFile, filepath.Join(dir, "filelink")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.g.Remove(dir, []string{f.cache}); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	if _, err := os.Lstat(dir); !os.IsNotExist(err) {
+		t.Errorf("dir should be removed, got %v", err)
+	}
+	if _, err := os.Stat(outsideFile); err != nil {
+		t.Error("symlink target outside root was deleted")
+	}
+}
+
+func FuzzGuardCheck(f *testing.F) {
+	base := f.TempDir()
+	home := filepath.Join(base, "home")
+	cache := filepath.Join(home, ".cache")
+	os.MkdirAll(filepath.Join(home, ".ssh"), 0o755)
+	os.MkdirAll(cache, 0o755)
+	g := NewGuard(home, os.Getuid(), []string{filepath.Join(home, "Documents")})
+
+	for _, seed := range []string{
+		"", "/", "/etc/passwd", "relative", cache, cache + "/../.ssh",
+		filepath.Join(home, ".ssh", "id_rsa"), cache + "/a\x00b", cache + "/a\nb",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, p string) {
+		err := g.Check(p, []string{cache})
+		if err == nil {
+			// Whatever passes Check must be clean, absolute, free of control chars, and under cache.
+			if !filepath.IsAbs(p) || filepath.Clean(p) != p || hasControl(p) {
+				t.Fatalf("Check allowed invalid path %q", p)
+			}
+		}
+	})
+}
