@@ -39,6 +39,7 @@ Flags for clean and purge:
   --dry-run   list what would be removed, remove nothing
   --yes       remove the safe, preselected items without asking
   --system    with clean --yes, also clean system items (asks for sudo)
+  --verbose   with clean --dry-run or --yes, also list each target path
 
 Flags for status and analyze:
   --json      print JSON instead of opening the interface
@@ -51,8 +52,9 @@ Icons are Nerd Font glyphs when a Nerd Font is installed or the terminal
 ships one (Ghostty, WezTerm), and emoji otherwise. LEGA_ICONS=nerd, emoji
 or off picks for you.
 
-Keep files safe from clean and purge by listing them, one per line,
-in ~/.config/lega/whitelist. Every removal is logged in
+Keep files safe from clean, purge and analyze by listing them, one per line,
+in ~/.config/lega/whitelist. List custom project folders for purge in
+~/.config/lega/purge_paths. Every removal is logged in
 ~/.local/state/lega/operations.log.
 `
 
@@ -80,9 +82,9 @@ func (e usageError) Error() string { return e.msg + " (see lega --help)" }
 
 // options are the flags shared by all commands.
 type options struct {
-	json, dryRun, yes, system, check bool
-	icons, noIcons                   bool
-	args                             []string
+	json, dryRun, yes, system, verbose, check bool
+	icons, noIcons                            bool
+	args                                      []string
 }
 
 func parse(name string, args []string, stderr io.Writer) (options, error) {
@@ -103,6 +105,7 @@ func parse(name string, args []string, stderr io.Writer) (options, error) {
 		fs.BoolVar(&o.yes, "yes", false, "do not ask")
 		if name == "clean" {
 			fs.BoolVar(&o.system, "system", false, "include system items")
+			fs.BoolVar(&o.verbose, "verbose", false, "list each target path")
 		}
 	case "update":
 		fs.BoolVar(&o.check, "check", false, "only check")
@@ -124,6 +127,9 @@ func parse(name string, args []string, stderr io.Writer) (options, error) {
 	o.args = rest
 	if o.system && !o.yes {
 		return o, usageError{"--system only works together with --yes"}
+	}
+	if o.verbose && !o.dryRun && !o.yes {
+		return o, usageError{"--verbose only works together with --dry-run or --yes"}
 	}
 	return o, nil
 }

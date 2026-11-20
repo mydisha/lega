@@ -64,6 +64,9 @@ func TestUsageErrors(t *testing.T) {
 	if _, _, err := lega("clean", "--system"); !errors.As(err, &u) {
 		t.Errorf("--system without --yes: %v", err)
 	}
+	if _, _, err := lega("clean", "--verbose"); !errors.As(err, &u) {
+		t.Errorf("--verbose without --dry-run/--yes: %v", err)
+	}
 	if _, _, err := lega("clean", "--nope"); err == nil || errors.Is(err, flag.ErrHelp) {
 		t.Errorf("unknown flag: %v", err)
 	}
@@ -155,6 +158,44 @@ func TestBadWhitelistStopsPurge(t *testing.T) {
 	os.Mkdir(filepath.Join(home, "code"), 0o755)
 	if _, _, err := lega("purge", "--yes"); err == nil || !strings.Contains(err.Error(), "whitelist") {
 		t.Errorf("want whitelist error, got %v", err)
+	}
+}
+
+func TestCleanDryRunVerbose(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("lega refuses to run as root")
+	}
+	home := fakeHome(t)
+	thumb := filepath.Join(home, ".cache", "thumbnails", "normal", "a.png")
+	write(t, thumb, 8000)
+
+	out, _, err := lega("clean", "--dry-run", "--verbose")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, filepath.Join(home, ".cache", "thumbnails", "normal")) {
+		t.Errorf("verbose dry-run should list target path:\n%s", out)
+	}
+}
+
+func TestPurgeCustomPathsFile(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("lega refuses to run as root")
+	}
+	home := fakeHome(t)
+	custom := filepath.Join(home, "custom-lab")
+	write(t, filepath.Join(custom, "svc", "composer.json"), 10)
+	write(t, filepath.Join(custom, "svc", "vendor", "lib.php"), 5000)
+	cfg := filepath.Join(home, ".config", "lega", "purge_paths")
+	os.MkdirAll(filepath.Dir(cfg), 0o755)
+	os.WriteFile(cfg, []byte("~/custom-lab\n"), 0o644)
+
+	out, _, err := lega("purge", "--dry-run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, filepath.Join(custom, "svc", "vendor")) {
+		t.Errorf("purge did not read purge_paths:\n%s", out)
 	}
 }
 

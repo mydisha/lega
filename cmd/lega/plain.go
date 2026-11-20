@@ -135,6 +135,11 @@ func plainClean(ctx context.Context, env platform.Env, o options, w io.Writer) e
 			note = "  (" + note + ")"
 		}
 		fmt.Fprintf(w, "%14s  %s%s\n", size, info.Name, note)
+		if o.verbose {
+			for _, t := range f.Targets {
+				fmt.Fprintf(w, "                %10s  %s\n", format.Size(t.Bytes), t.Path)
+			}
+		}
 		if note != "" {
 			continue
 		}
@@ -218,7 +223,15 @@ func plainPurge(ctx context.Context, env platform.Env, o options, w io.Writer) e
 	g.Whitelist = wl
 	roots := o.args
 	if len(roots) == 0 {
-		roots = purge.DefaultRoots(env.Home)
+		custom, err := purge.LoadRoots(purge.RootsPath(env.ConfigDir), env.Home)
+		if err != nil {
+			return fmt.Errorf("%w; fix or remove %s, then try again", err, purge.RootsPath(env.ConfigDir))
+		}
+		if len(custom) > 0 {
+			roots = custom
+		} else {
+			roots = purge.DefaultRoots(env.Home)
+		}
 	}
 	if len(roots) == 0 {
 		return usageError{"no project folders found in your home; pass one: lega purge <folder>"}
