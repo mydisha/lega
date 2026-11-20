@@ -76,6 +76,8 @@ func TestProcesses(t *testing.T) {
 	}
 	write("100", "GeckoMain", "/snap/firefox/123/usr/lib/firefox/firefox\x00-contentproc")
 	write("200", "code", "/usr/share/code/code\x00--type=zygote")
+	write("250", "telegram-deskto", "/usr/bin/wrapper\x00--flag")
+	os.Symlink("/usr/bin/telegram-desktop (deleted)", filepath.Join(proc, "250", "exe"))
 	write("self", "ignored", "ignored")
 	os.MkdirAll(filepath.Join(proc, "300"), 0o755) // no comm or cmdline
 
@@ -83,7 +85,7 @@ func TestProcesses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"GeckoMain", "firefox", "code"} {
+	for _, want := range []string{"GeckoMain", "firefox", "code", "telegram-desktop"} {
 		if !got[want] {
 			t.Errorf("missing %q in %v", want, got)
 		}

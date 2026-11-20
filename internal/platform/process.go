@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
 // Processes returns the names of processes owned by uid, read from procDir
-// (normally /proc). Both the kernel name (comm, cut to 15 bytes) and the
-// base name of argv[0] are included, so "firefox" matches either way.
+// (normally /proc). The kernel name (comm, cut to 15 bytes), the base name of
+// argv[0], and the target binary of exe are all included so wrapped or
+// truncated process names still match.
 func Processes(procDir string, uid int) (map[string]bool, error) {
 	entries, err := os.ReadDir(procDir)
 	if err != nil {
@@ -38,6 +40,12 @@ func Processes(procDir string, uid int) (map[string]bool, error) {
 			argv0, _, _ := bytes.Cut(b, []byte{0})
 			if len(argv0) > 0 {
 				names[filepath.Base(string(argv0))] = true
+			}
+		}
+		if target, err := os.Readlink(filepath.Join(dir, "exe")); err == nil {
+			target = strings.TrimSuffix(target, " (deleted)")
+			if base := filepath.Base(target); base != "" && base != "." && base != "/" {
+				names[base] = true
 			}
 		}
 	}
