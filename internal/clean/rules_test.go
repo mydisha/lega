@@ -130,12 +130,78 @@ func TestDockerBuildCache(t *testing.T) {
 func TestParseUnitSize(t *testing.T) {
 	cases := map[string]int64{
 		"0B": 0, "300kB": 300_000, "512MB (45%)": 512_000_000, "1.5G": 1_500_000_000,
-		"2TB": 2_000_000_000_000, "42": 42, "": 0, "abc": 0, "7XB": 0,
+		"2TB": 2_000_000_000_000, "2KiB": 2048, "1MiB": 1024 * 1024, "1GiB": 1024 * 1024 * 1024,
+		"42": 42, "": 0, "abc": 0, "7XB": 0,
 	}
 	for in, want := range cases {
 		if got := parseUnitSize(in); got != want {
 			t.Errorf("parseUnitSize(%q) = %d, want %d", in, got, want)
 		}
+	}
+}
+
+func TestTelegramKeepsLoginData(t *testing.T) {
+	c := testContext(t)
+	tdata := filepath.Join(c.Env.DataDir, "TelegramDesktop", "tdata")
+	cacheFile := filepath.Join(tdata, "user_data", "cache", "img.bin")
+	keyFile := filepath.Join(tdata, "key_datas")
+	write(t, cacheFile, 5000)
+	write(t, keyFile, 100)
+
+	f := findingFor(Scan(context.Background(), c, userRules(), nil), "telegram")
+	if f == nil || len(f.Targets) != 1 {
+		t.Fatalf("telegram finding: %+v", f)
+	}
+	Clean(context.Background(), c, *f)
+	if exists(cacheFile) {
+		t.Error("telegram cache should be removed")
+	}
+	if !exists(keyFile) {
+		t.Error("telegram login data was removed")
+	}
+}
+
+func TestSteamAndAndroidKeepUserData(t *testing.T) {
+	c := testContext(t)
+	steam := filepath.Join(c.Env.DataDir, "Steam")
+	write(t, filepath.Join(steam, "appcache", "httpcache", "a"), 4000)
+	game := filepath.Join(steam, "steamapps", "common", "Game", "save.dat")
+	write(t, game, 100)
+
+	android := filepath.Join(c.Env.Home, ".android")
+	write(t, filepath.Join(android, "build-cache", "obj"), 4000)
+	keystore := filepath.Join(android, "debug.keystore")
+	write(t, keystore, 100)
+
+	found := Scan(context.Background(), c, userRules(), nil)
+	sf := findingFor(found, "steam-cache")
+	af := findingFor(found, "android-cache")
+	if sf == nil || af == nil {
+		t.Fatalf("expected steam-cache and android-cache findings: steam=%+v android=%+v", sf, af)
+	}
+	Clean(context.Background(), c, *sf)
+	Clean(context.Background(), c, *af)
+	if !exists(game) {
+		t.Error("steam game file was removed")
+	}
+	if !exists(keystore) {
+		t.Error("android keystore was removed")
+	}
+}
+
+func TestUvEnvOverrideAndZenBrowser(t *testing.T) {
+	c := testContext(t)
+	customUV := filepath.Join(c.Env.Home, "fast-uv")
+	t.Setenv("UV_CACHE_DIR", customUV)
+	write(t, filepath.Join(customUV, "archive-v0", "pkg.whl"), 6000)
+	write(t, filepath.Join(c.Env.CacheDir, "zen", "abc.default", "cache2", "entries", "1"), 4000)
+
+	found := Scan(context.Background(), c, userRules(), nil)
+	if f := findingFor(found, "uv"); f == nil || len(f.Targets) != 1 {
+		t.Fatalf("uv finding with UV_CACHE_DIR: %+v", f)
+	}
+	if f := findingFor(found, "zen"); f == nil || len(f.Targets) != 1 {
+		t.Fatalf("zen finding: %+v", f)
 	}
 }
 

@@ -35,16 +35,30 @@ func systemRules() []Rule {
 			spots: []spot{
 				{"$DATA/Trash", trashParts},
 				{"/media/$USER/*/.Trash-$UID", trashParts},
+				{"/run/media/$USER/*/.Trash-$UID", trashParts},
 			},
 		},
 		&pathRule{
 			info: Info{
 				ID: "old-installers", Name: "Old installers in Downloads", Group: GroupFiles, Risk: Review,
-				Description: "Package and disk image files (.deb, .AppImage, .iso, .run, .rpm) not touched for 30 days.",
+				Description: "Package and disk image files (.deb, .AppImage, .iso, .img, .run, .rpm, .flatpak, .snap) not touched for 30 days.",
 			},
-			spots:     []spot{{"$DOWNLOAD", []string{"*.deb", "*.AppImage", "*.appimage", "*.iso", "*.run", "*.rpm"}}},
+			spots: []spot{{"$DOWNLOAD", []string{
+				"*.deb", "*.AppImage", "*.appimage", "*.iso", "*.img",
+				"*.run", "*.rpm", "*.flatpak", "*.flatpakref", "*.snap",
+			}}},
 			olderThan: month,
 			filesOnly: true,
+		},
+		&commandRule{
+			info: Info{
+				ID: "flatpak-user-unused", Name: "Unused user Flatpak runtimes", Group: GroupApps, Risk: Review,
+				Needs:       []string{"flatpak"},
+				Description: "User Flatpak runtimes no installed app uses, removed with \"flatpak uninstall --user --unused\". The size is known only after cleaning.",
+			},
+			measure:  []string{"$DATA/flatpak/runtime"},
+			cmd:      []string{"flatpak", "uninstall", "--user", "--unused", "-y", "--noninteractive"},
+			hideSize: true,
 		},
 	}
 }

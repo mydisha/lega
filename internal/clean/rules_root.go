@@ -50,6 +50,13 @@ func rootRules() []Rule {
 		},
 		&pathRule{
 			info: Info{
+				ID: "packagekit-cache", Name: "PackageKit update cache", Group: GroupRoot, NeedsRoot: true,
+				Description: "Old packages cached by GNOME Software and PackageKit in /var/cache/PackageKit.",
+			},
+			spots: []spot{{"/var/cache/PackageKit", []string{"*"}}},
+		},
+		&pathRule{
+			info: Info{
 				ID: "crash-reports", Name: "Crash reports and core dumps", Group: GroupRoot, NeedsRoot: true,
 				Description: "Reports left by crashed programs in /var/crash and systemd core dumps.",
 			},
@@ -58,7 +65,24 @@ func rootRules() []Rule {
 				{"/var/lib/systemd/coredump", []string{"*"}},
 			},
 		},
+		&pathRule{
+			info: Info{
+				ID: "cups-tmp", Name: "Old print spool temp files", Group: GroupRoot, NeedsRoot: true,
+				Description: "Temporary CUPS print files older than 7 days in /var/spool/cups/tmp.",
+			},
+			spots:     []spot{{"/var/spool/cups/tmp", []string{"*"}}},
+			olderThan: 7 * 24 * time.Hour,
+			filesOnly: true,
+		},
 		&snapRevisions{},
+		&pathRule{
+			info: Info{
+				ID: "snapd-cache", Name: "Snap download cache", Group: GroupRoot, NeedsRoot: true, Needs: []string{"snap"},
+				Description: "Cached snap package blobs in /var/lib/snapd/cache. Installed snaps stay intact.",
+			},
+			spots:     []spot{{"/var/lib/snapd/cache", []string{"*"}}},
+			filesOnly: true,
+		},
 		&commandRule{
 			info: Info{
 				ID: "flatpak-unused", Name: "Unused Flatpak runtimes", Group: GroupRoot, Risk: Review,
