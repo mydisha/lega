@@ -83,21 +83,28 @@ var (
 
 // ruleIcons maps clean rule IDs to the app or kind of data they clean.
 var ruleIcons = map[string]glyph{
-	"firefox": icoFirefox, "chrome": icoChrome, "chromium": icoChrome,
+	"firefox": icoFirefox, "zen": icoFirefox, "librewolf": icoFirefox, "epiphany": icoGlobe,
+	"chrome": icoChrome, "chromium": icoChrome,
 	"brave": icoBrave, "vivaldi": icoGlobe, "opera": icoOpera, "edge": icoEdge,
 
 	"npm": icoNpm, "yarn": icoYarn, "pnpm": icoPackage, "bun": icoBun, "deno": icoDeno,
-	"pip": icoPython, "go-build": icoGo, "go-mod": icoGo, "cargo": icoRust,
+	"pip": icoPython, "uv": icoPython, "poetry": icoPython, "pre-commit": icoGit, "conda": icoPython,
+	"go-build": icoGo, "go-mod": icoGo, "cargo": icoRust,
 	"gradle": icoGradle, "maven": icoMaven, "composer": icoComposer,
-	"vscode": icoVSCode, "jetbrains": icoJetBrain, "docker-build": icoDocker,
+	"pub-cache": icoDart, "android-cache": icoApp, "compiler-cache": icoCode,
+	"nuget": icoPackage, "bundler": icoPackage, "homebrew": icoPackage, "playwright": icoGlobe,
+	"vscode": icoVSCode, "zed": icoCode, "jetbrains": icoJetBrain,
+	"huggingface": icoApp, "torch-cache": icoPython,
+	"docker-build": icoDocker, "podman-build": icoDocker,
 
 	"thumbnails": icoPictures, "session-logs": icoText, "trash": icoTrash,
-	"old-installers": icoDownload, "chat-apps": icoChat, "app-caches": icoApp,
-	"snap-caches": icoSnap, "snap-revisions": icoSnap,
-	"flatpak-caches": icoFlatpak, "flatpak-unused": icoFlatpak,
+	"old-installers": icoDownload, "chat-apps": icoChat, "telegram": icoChat,
+	"spotify": icoMusic, "steam-cache": icoApp, "gpu-shaders": icoApp, "app-caches": icoApp,
+	"snap-caches": icoSnap, "snap-revisions": icoSnap, "snapd-cache": icoSnap,
+	"flatpak-caches": icoFlatpak, "flatpak-unused": icoFlatpak, "flatpak-user-unused": icoFlatpak,
 
-	"apt-cache": icoPackage, "apt-autoremove": icoTux, "journal": icoText,
-	"rotated-logs": icoText, "crash-reports": icoBug,
+	"apt-cache": icoPackage, "apt-autoremove": icoTux, "packagekit-cache": icoPackage,
+	"journal": icoText, "rotated-logs": icoText, "crash-reports": icoBug, "cups-tmp": icoText,
 }
 
 // ruleIcon returns the icon for a clean rule, or a generic one for rules
@@ -115,10 +122,14 @@ var dirIcons = map[string]glyph{
 	".mozilla": icoFirefox, ".vscode": icoVSCode, ".npm": icoNpm,
 	"node_modules": icoNode, ".next": icoNode, ".nuxt": icoNode, ".svelte-kit": icoNode,
 	".turbo": icoNode, ".parcel-cache": icoNode, ".yarn": icoYarn, ".bun": icoBun,
+	".angular": icoNode, ".astro": icoNode, ".vite": icoNode, ".output": icoNode,
+	".webpack": icoNode, ".nyc_output": icoNode, "storybook-static": icoNode, ".storybook-static": icoNode,
 	".venv": icoPython, "venv": icoPython, "__pycache__": icoPython,
-	".pytest_cache": icoPython, ".mypy_cache": icoPython,
-	"go": icoGo, ".cargo": icoRust, ".rustup": icoRust,
+	".pytest_cache": icoPython, ".mypy_cache": icoPython, ".ruff_cache": icoPython,
+	".tox": icoPython, ".nox": icoPython, ".hypothesis": icoPython, "htmlcov": icoPython, ".eggs": icoPython,
+	"go": icoGo, ".cargo": icoRust, ".rustup": icoRust, "vendor": icoComposer,
 	".gradle": icoGradle, ".m2": icoMaven, ".dart_tool": icoDart, ".pub-cache": icoDart,
+	".terraform": icoConfig,
 }
 
 // userDirIcons maps XDG user-dirs keys (see platform.Env.UserDirs) to
