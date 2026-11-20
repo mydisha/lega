@@ -201,11 +201,12 @@ export LEGA_ICONS=emoji               # or always use emoji (or nerd)
 Every command also works without the interface:
 
 ```sh
-lega clean --dry-run          # list what would be removed
-lega clean --yes              # remove the preselected user items
-lega clean --yes --system     # ... and the preselected system items (asks for sudo)
-lega purge --dry-run ~/code   # list build folders under ~/code
-lega purge --yes              # remove build folders not used in the last 7 days
+lega clean --dry-run            # list what would be removed
+lega clean --dry-run --verbose  # ... and every target path
+lega clean --yes                # remove the preselected user items
+lega clean --yes --system       # ... and the preselected system items (asks for sudo)
+lega purge --dry-run ~/code     # list build folders under ~/code
+lega purge --yes                # remove build folders not used in the last 7 days
 lega status --json
 lega analyze --json ~/Downloads
 ```
@@ -218,36 +219,44 @@ select them.
 | Group | Item | Default |
 | --- | --- | --- |
 | System | Thumbnail cache, old desktop session logs | selected |
-| Browsers | Cache of Firefox (deb, snap, Flatpak), Chrome, Chromium, Brave, Edge, Vivaldi, Opera. Logins, history and bookmarks are kept | selected |
-| Developer tools | npm, Yarn, pnpm (`pnpm store prune`), pip, Go build cache, Composer, Bun, Deno, VS Code / VSCodium / Cursor caches | selected |
-| Developer tools | Go module cache, Cargo registry, Gradle, Maven, JetBrains caches, Docker build cache (`docker builder prune`) | review |
-| Apps | Slack, Discord and Teams caches | selected |
-| Apps | Snap and Flatpak app caches, everything else in `~/.cache` | review |
+| Browsers | Cache of Firefox, Zen, LibreWolf, GNOME Web, Chrome, Chromium, Brave, Edge, Vivaldi and Opera (deb, snap, Flatpak). Logins, history and bookmarks are kept | selected |
+| Developer tools | npm, Yarn, pnpm (`pnpm store prune`), pip, uv, Poetry, Go build cache, Composer, Bun, Deno, Android build cache, ccache/sccache, Bundler, Homebrew cache, VS Code / VSCodium / Cursor / Windsurf and Zed caches | selected |
+| Developer tools | Go module cache, Cargo registry, Gradle, Maven, Dart/Flutter pub cache, NuGet, Conda, pre-commit, Playwright/Puppeteer/Cypress/Electron runtimes, JetBrains caches, Hugging Face and PyTorch/Whisper caches, Docker build cache, Podman unused images | review |
+| Apps | Slack, Discord, Teams, Vesktop, Element, Telegram media cache, Spotify cache, Steam cache/logs, Mesa/Vulkan/NVIDIA GPU shader caches | selected |
+| Apps | Snap and Flatpak app caches, unused user Flatpak runtimes, everything else in `~/.cache` | review |
 | Files | Trash (also on mounted drives), installers in Downloads older than 30 days | review |
-| System, needs sudo | APT package cache (`apt-get clean`), journal older than 14 days, rotated logs in `/var/log`, crash reports and core dumps, old snap versions | selected |
-| System, needs sudo | Unused packages and old kernels (`apt-get autoremove --purge`), unused Flatpak runtimes | review |
+| System, needs sudo | APT package cache (`apt-get clean`), PackageKit update cache, journal older than 14 days, rotated logs in `/var/log`, crash reports and core dumps, old print spool temp files, old snap versions, snap download cache | selected |
+| System, needs sudo | Unused packages and old kernels (`apt-get autoremove --purge`), unused system Flatpak runtimes | review |
 
 `lega purge` looks in `~/Projects`, `~/code`, `~/dev`, `~/src`, `~/www`,
-`~/workspace` and similar folders for `node_modules`, `target`, `.venv`,
-`venv`, `__pycache__`, `.next`, `.nuxt`, `.svelte-kit`, `.turbo`, `.gradle`,
-`.dart_tool`, Python tool caches, and `build` or `dist` next to a project file.
+`~/workspace` and similar folders (or custom folders listed in
+`~/.config/lega/purge_paths`) for `node_modules`, `target`, `.venv`, `venv`,
+`__pycache__`, `.ruff_cache`, `.tox`, `.nox`, `.next`, `.nuxt`, `.svelte-kit`,
+`.angular`, `.astro`, `.vite`, `.output`, `.turbo`, `.gradle`, `.dart_tool`,
+`vendor` (Composer), `_build`/`deps` (Elixir), `zig-out`/`.zig-cache`, `obj`
+(.NET), `.terraform`, CMake build folders, Python tool caches, and `build`,
+`dist` or `coverage` next to a project file.
 
 ## Safety
 
-- Every path is checked right before it is deleted: it must sit inside the
-  folder its rule cleans, symlinks are never followed out of that folder, and
-  mount points and files owned by other users are skipped.
+- Every path is checked right before it is deleted and removed via
+  directory-relative syscalls: it must sit inside the folder its rule cleans,
+  the target inode is verified against TOCTOU swaps, symlinks are never
+  followed out of that folder, and nested mount points, protected paths,
+  whitelisted paths and files owned by other users are refused.
 - Your home folder, `~/.config`, `~/.local`, your personal folders (Documents,
-  Pictures, ...) and system folders are never deleted. Nothing inside `~/.ssh`,
-  `~/.gnupg` or your keyrings is touched.
-- Browser and editor caches are locked while the app is running.
-- `analyze` moves things to the Trash. It only deletes for good when a drive
-  has no Trash, and asks first.
-- `purge` skips build folders that git tracks and leaves folders used in the
-  last 7 days unselected.
-- System items run through `sudo lega _root-clean <item>`. Only item names
-  cross over to root; the root side finds the files again by itself, with the
-  same checks.
+  Pictures, ...) and system folders are never deleted. Nothing at, inside or
+  containing `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.kube`, password managers or
+  keyrings is touched.
+- Browser, editor and chat app caches are locked while the app is running, and
+  running processes are re-checked right before cleaning starts.
+- `analyze` respects `~/.config/lega/whitelist` and moves things to the Trash.
+  It only deletes for good when a drive has no Trash, and asks first.
+- `purge` stays on the same filesystem, skips build folders that git tracks and
+  leaves folders used in the last 7 days unselected.
+- System items run through `sudo lega _root-clean <item>`. Only validated rule
+  IDs cross over to root; the root side finds the files again by itself, with
+  the same checks and the caller's whitelist.
 
 ### Keep list
 
@@ -260,8 +269,8 @@ List paths or glob patterns that lega must never remove, one per line, in
 /var/log/*.gz
 ```
 
-If this file exists but cannot be read, `clean` and `purge` stop instead of
-running without it.
+If this file exists but cannot be read, `clean`, `purge` and `analyze`
+deletions stop instead of running without it.
 
 ### Log
 
