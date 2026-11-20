@@ -63,10 +63,11 @@ func printStatusJSON(ctx context.Context, env platform.Env, rel platform.OSRelea
 		Free       int64  `json:"free_bytes"`
 	}
 	out := struct {
-		System string     `json:"system"`
-		Disks  []jsonDisk `json:"disks"`
-		Home   jsonFolder `json:"home"`
-	}{System: rel.DisplayName(), Disks: []jsonDisk{}}
+		Version string     `json:"version"`
+		System  string     `json:"system"`
+		Disks   []jsonDisk `json:"disks"`
+		Home    jsonFolder `json:"home"`
+	}{Version: displayVersion(), System: rel.DisplayName(), Disks: []jsonDisk{}}
 	for _, m := range mounts {
 		out.Disks = append(out.Disks, jsonDisk{m.MountPoint, m.Device, m.FSType, m.Total, m.Used, m.Free})
 	}
@@ -109,6 +110,7 @@ func plainClean(ctx context.Context, env platform.Env, o options, w io.Writer) e
 	c := clean.NewContext(env, wl)
 	found := clean.Scan(ctx, c, clean.Available(c, clean.Rules()), nil)
 
+	fmt.Fprintf(w, "lega %s\n\n", displayVersion())
 	var picked, rootPicked []clean.Finding
 	var total int64
 	for _, f := range found {
@@ -241,6 +243,7 @@ func plainPurge(ctx context.Context, env platform.Env, o options, w io.Writer) e
 		return err
 	}
 
+	fmt.Fprintf(w, "lega %s\n\n", displayVersion())
 	var total int64
 	for _, a := range found {
 		note := ""

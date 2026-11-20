@@ -14,7 +14,7 @@ func TestMenu(t *testing.T) {
 	m := newMenu(sh)
 	m = settle(m, m.Init())
 	view := ansi.Strip(m.View())
-	for _, want := range []string{"Zorin OS 18.1", "free of", "1  Status", "2  Clean", "3  Analyze", "4  Purge"} {
+	for _, want := range []string{"v0.2.0 (build 42)", "Zorin OS 18.1", "free of", "1  Status", "2  Clean", "3  Analyze", "4  Purge"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("menu lacks %q:\n%s", want, view)
 		}
@@ -62,4 +62,18 @@ func TestThemeFollowsBackground(t *testing.T) {
 	if r>>8 != 0xf5 || g>>8 != 0xa1 || b>>8 != 0x73 {
 		t.Errorf("dark background should use the lighter accent, got %x %x %x", r>>8, g>>8, b>>8)
 	}
+}
+
+func TestAppFooterShowsVersionOnSubscreen(t *testing.T) {
+	sh := testShared(t, 80)
+	a := newApp(sh, newStatus)
+	v := a.View()
+	if v.WindowTitle != "lega v0.2.0 (build 42)" {
+		t.Errorf("WindowTitle = %q", v.WindowTitle)
+	}
+	plain := ansi.Strip(v.Content)
+	if !strings.Contains(plain, "lega v0.2.0 (build 42)") {
+		t.Errorf("subscreen footer should show version:\n%s", plain)
+	}
+	fitsWidth(t, v.Content, 80)
 }

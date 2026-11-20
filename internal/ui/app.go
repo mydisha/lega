@@ -7,6 +7,7 @@ import (
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/mydisha/lega/internal/platform"
 )
@@ -34,6 +35,8 @@ type shared struct {
 	icons IconSet
 	// userDirs are the XDG user folders by key, read once for the icons.
 	userDirs map[string]string
+	// version is the build version displayed on screens.
+	version string
 }
 
 // pushMsg opens a screen on top of the current one.
@@ -110,6 +113,12 @@ func (a *app) View() tea.View {
 	}
 	body := a.top().View()
 	helpLine := a.help.ShortHelpView(a.top().Keys())
+	if _, isMenu := a.top().(*menu); !isMenu && a.sh.version != "" {
+		tag := "lega " + a.sh.version
+		if pad := a.sh.w() - ansi.StringWidth(helpLine) - ansi.StringWidth(tag); pad >= 2 {
+			helpLine += strings.Repeat(" ", pad) + a.sh.theme.Dim.Render(tag)
+		}
+	}
 	// Keep the help line at the bottom of the screen.
 	gap := a.sh.height - strings.Count(body, "\n") - 2
 	if gap < 1 {
@@ -118,6 +127,9 @@ func (a *app) View() tea.View {
 	v := tea.NewView(body + strings.Repeat("\n", gap) + helpLine)
 	v.AltScreen = true
 	v.WindowTitle = "lega"
+	if a.sh.version != "" {
+		v.WindowTitle = "lega " + a.sh.version
+	}
 	return v
 }
 

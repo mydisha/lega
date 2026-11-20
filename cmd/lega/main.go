@@ -19,8 +19,13 @@ import (
 	"github.com/mydisha/lega/internal/ui"
 )
 
-// version is set at build time with -ldflags "-X main.version=...".
-var version = "dev"
+// version, build and commit are set at build time with -ldflags
+// "-X main.version=... -X main.build=... -X main.commit=...".
+var (
+	version = "dev"
+	build   = ""
+	commit  = ""
+)
 
 const usage = `lega frees up disk space on Ubuntu, Linux Mint, Zorin OS, Pop!_OS and
 other Ubuntu-based systems.
@@ -145,7 +150,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		fmt.Fprint(stdout, usage)
 		return nil
 	case "-v", "--version", "version":
-		fmt.Fprintln(stdout, "lega", currentVersion())
+		fmt.Fprintln(stdout, "lega", displayVersion())
 		return nil
 	case clean.RootCommand:
 		return clean.RootMain(ctx, args, stdout)
@@ -188,7 +193,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		return usageError{"no terminal to draw on; use --json, --dry-run or --yes"}
 	}
 	icons := pickIcons(o, os.Getenv, platform.NerdFontInstalled)
-	return ui.Run(ctx, ui.Config{Env: env, Release: rel, Icons: icons}, cmd, o.args)
+	return ui.Run(ctx, ui.Config{Env: env, Release: rel, Icons: icons, Version: displayVersion()}, cmd, o.args)
 }
 
 // pickIcons chooses the icon set. --no-icons turns icons off, and

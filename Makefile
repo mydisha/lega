@@ -1,10 +1,12 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+BUILD ?= $(shell git rev-list --count HEAD 2>/dev/null || true)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || true)
 
 .PHONY: build install test lint release release-notes release-gh
 
-# Build ./lega with the version from git.
+# Build ./lega with the version, build number and commit from git.
 build:
-	go build -trimpath -ldflags "-s -w -X main.version=$(VERSION:v%=%)" -o lega ./cmd/lega
+	go build -trimpath -ldflags "-s -w -X main.version=$(VERSION:v%=%) -X main.build=$(BUILD) -X main.commit=$(COMMIT)" -o lega ./cmd/lega
 
 # Build and put lega in ~/.local/bin, for trying out your own changes.
 install: build

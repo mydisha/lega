@@ -45,7 +45,7 @@ func TestBannerLayouts(t *testing.T) {
 			sys  platform.SysInfo
 		}{{"normal", rel, testSys}, {"long values", longRel, long}} {
 			t.Run(c.name+"/"+si.name, func(t *testing.T) {
-				view := banner(th, si.rel, si.sys, c.w, c.rows)
+				view := banner(th, "v0.2.0 (build 42)", si.rel, si.sys, c.w, c.rows)
 				fitsWidth(t, view, c.w)
 				lines := strings.Split(view, "\n")
 				if len(lines) > max(c.rows, 1) {
@@ -58,7 +58,7 @@ func TestBannerLayouts(t *testing.T) {
 				if got := strings.Contains(plain, "memory"); got != c.info {
 					t.Errorf("system rows drawn = %v, want %v:\n%s", got, c.info, plain)
 				}
-				if c.sideBySide && !strings.Contains(ansi.Strip(lines[0]), "host") {
+				if c.sideBySide && !strings.Contains(ansi.Strip(lines[0]), "version") {
 					t.Errorf("summary should sit beside the logo:\n%s", plain)
 				}
 				if !strings.HasPrefix(plain, "lega") && !c.logo && c.w > len("lega") {
@@ -71,9 +71,9 @@ func TestBannerLayouts(t *testing.T) {
 
 func TestBannerValues(t *testing.T) {
 	rel := platform.OSRelease{PrettyName: "Ubuntu 24.04.1 LTS"}
-	plain := ansi.Strip(banner(NewTheme(true), rel, testSys, 100, 20))
-	for _, want := range []string{"host    thinkpad", "os      Ubuntu 24.04.1 LTS", "kernel  7.0.0-42-generic",
-		"cpu     AMD Ryzen 5 PRO 6650U · 12 threads", "memory  8.1 GB used of 15.5 GB"} {
+	plain := ansi.Strip(banner(NewTheme(true), "v0.2.0 (build 42)", rel, testSys, 100, 20))
+	for _, want := range []string{"version  v0.2.0 (build 42)", "host     thinkpad", "os       Ubuntu 24.04.1 LTS",
+		"kernel   7.0.0-42-generic", "cpu      AMD Ryzen 5 PRO 6650U · 12 threads", "memory   8.1 GB used of 15.5 GB"} {
 		if !strings.Contains(plain, want) {
 			t.Errorf("banner lacks %q:\n%s", want, plain)
 		}
@@ -81,7 +81,7 @@ func TestBannerValues(t *testing.T) {
 }
 
 func TestSysRowsSkipsUnknown(t *testing.T) {
-	rows := sysRows(platform.OSRelease{}, platform.SysInfo{Threads: 4, MemTotal: 8e9})
+	rows := sysRows("", platform.OSRelease{}, platform.SysInfo{Threads: 4, MemTotal: 8e9})
 	got := map[string]string{}
 	for _, r := range rows {
 		got[r[0]] = r[1]

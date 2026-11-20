@@ -23,18 +23,19 @@ var logo = []string{
 
 const (
 	logoGap      = 4  // cells between the logo and the system summary
-	infoLabelW   = 8  // "memory" plus two spaces
+	infoLabelW   = 9  // "version" plus two spaces
 	minInfoValue = 16 // narrowest value worth showing beside the logo
 )
 
 // sysRows returns the label and value of each known system fact.
-func sysRows(rel platform.OSRelease, si platform.SysInfo) [][2]string {
+func sysRows(version string, rel platform.OSRelease, si platform.SysInfo) [][2]string {
 	var rows [][2]string
 	add := func(label, value string) {
 		if value != "" {
 			rows = append(rows, [2]string{label, value})
 		}
 	}
+	add("version", version)
 	add("host", si.Host)
 	add("os", rel.DisplayName())
 	add("kernel", si.Kernel)
@@ -55,8 +56,8 @@ func sysRows(rel platform.OSRelease, si platform.SysInfo) [][2]string {
 // banner draws the logo with the system summary beside it, in at most
 // maxRows rows of w cells. It falls back to the summary under the logo,
 // then to the summary alone, then to one title line, as space runs out.
-func banner(t Theme, rel platform.OSRelease, si platform.SysInfo, w, maxRows int) string {
-	rows := sysRows(rel, si)
+func banner(t Theme, version string, rel platform.OSRelease, si platform.SysInfo, w, maxRows int) string {
+	rows := sysRows(version, rel, si)
 	logoW := ansi.StringWidth(logo[0])
 	info := func(valueW int) []string {
 		lines := make([]string, len(rows))
@@ -89,7 +90,11 @@ func banner(t Theme, rel platform.OSRelease, si platform.SysInfo, w, maxRows int
 		lines = append(lines, t.Accent.Bold(true).Render("lega"), "")
 		lines = append(lines, info(w-infoLabelW)...)
 	default:
-		title := t.Bold.Render("lega") + "  " + t.Dim.Render(rel.DisplayName())
+		title := t.Bold.Render("lega")
+		if version != "" {
+			title += " " + t.Dim.Render(version)
+		}
+		title += "  " + t.Dim.Render(rel.DisplayName())
 		lines = append(lines, strings.TrimRight(fit(title, w), " "))
 	}
 	return strings.Join(lines, "\n")

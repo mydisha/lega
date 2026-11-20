@@ -90,7 +90,7 @@ func (m *menu) View() string {
 	// Rows the menu needs below the banner: a gap, the free space line, a
 	// gap, the items, and the gap and help line at the bottom.
 	below := 3 + len(m.items) + 2
-	b.WriteString(banner(t, m.sh.release, m.sys, w, m.sh.h()-below) + "\n\n")
+	b.WriteString(banner(t, m.sh.version, m.sh.release, m.sys, w, m.sh.h()-below) + "\n\n")
 	if m.total > 0 {
 		fmt.Fprintf(&b, "%s free of %s in your home disk\n\n", t.Accent.Render(format.Size(m.free)), format.Size(m.total))
 	}

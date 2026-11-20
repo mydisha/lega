@@ -43,6 +43,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Set build number
+        run: echo "LEGA_BUILD=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
       - name: Write release notes
         run: scripts/release-notes.sh | tee "$RUNNER_TEMP/notes.md"
       - uses: goreleaser/goreleaser-action@v7

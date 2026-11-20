@@ -33,6 +33,53 @@ func currentVersion() string {
 	return version
 }
 
+// displayVersion formats the version, build number and commit for display.
+func displayVersion() string {
+	ver := currentVersion()
+	if ver != "dev" && !strings.HasPrefix(ver, "v") {
+		ver = "v" + ver
+	}
+	c := commit
+	dirty := false
+	if c == "" {
+		c, dirty = vcsCommit()
+	}
+	var meta []string
+	if build != "" {
+		meta = append(meta, "build "+build)
+	}
+	if c != "" && !strings.Contains(ver, c) {
+		meta = append(meta, c)
+	}
+	if dirty && !strings.Contains(ver, "dirty") {
+		meta = append(meta, "dirty")
+	}
+	if len(meta) == 0 {
+		return ver
+	}
+	return fmt.Sprintf("%s (%s)", ver, strings.Join(meta, ", "))
+}
+
+// vcsCommit reads the short commit hash and dirty flag embedded by "go build".
+func vcsCommit() (rev string, dirty bool) {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "", false
+	}
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+			if len(rev) > 7 {
+				rev = rev[:7]
+			}
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	return rev, dirty
+}
+
 // selfPath returns the running binary with symlinks resolved.
 func selfPath() (string, error) {
 	exe, err := executable()

@@ -52,6 +52,28 @@ func TestHelpAndVersion(t *testing.T) {
 	}
 }
 
+func TestDisplayVersion(t *testing.T) {
+	oldV, oldB, oldC := version, build, commit
+	t.Cleanup(func() { version, build, commit = oldV, oldB, oldC })
+
+	cases := []struct {
+		v, b, c string
+		want    string
+	}{
+		{"0.3.0", "58", "a1b2c3d", "v0.3.0 (build 58, a1b2c3d)"},
+		{"0.2.0-9-gc840c5b", "58", "c840c5b", "v0.2.0-9-gc840c5b (build 58)"},
+		{"0.3.0", "58", "", "v0.3.0 (build 58)"},
+		{"0.3.0", "", "", "v0.3.0"},
+		{"dev", "12", "abc1234", "dev (build 12, abc1234)"},
+	}
+	for _, tc := range cases {
+		version, build, commit = tc.v, tc.b, tc.c
+		if got := displayVersion(); got != tc.want {
+			t.Errorf("displayVersion(%q, %q, %q) = %q, want %q", tc.v, tc.b, tc.c, got, tc.want)
+		}
+	}
+}
+
 func TestUsageErrors(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("lega refuses to run as root")

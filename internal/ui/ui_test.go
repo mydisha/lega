@@ -27,6 +27,7 @@ func testShared(t *testing.T, width int) *shared {
 			DataDir: filepath.Join(home, ".local/share"), StateDir: filepath.Join(home, ".local/state"),
 		},
 		release: platform.OSRelease{PrettyName: "Zorin OS 18.1"},
+		version: "v0.2.0 (build 42)",
 	}
 }
 

@@ -15,6 +15,8 @@ type Config struct {
 	Release platform.OSRelease
 	// Icons is the icon set drawn next to files, folders and apps.
 	Icons IconSet
+	// Version is the formatted build version shown in the interface.
+	Version string
 }
 
 // Run starts the interface on the named screen (menu, status, analyze,
@@ -40,7 +42,7 @@ func Run(ctx context.Context, cfg Config, start string, args []string) error {
 	default:
 		return fmt.Errorf("unknown screen %q", start)
 	}
-	sh := &shared{theme: NewTheme(true), env: cfg.Env, release: cfg.Release, ctx: ctx, icons: cfg.Icons}
+	sh := &shared{theme: NewTheme(true), env: cfg.Env, release: cfg.Release, ctx: ctx, icons: cfg.Icons, version: cfg.Version}
 	if cfg.Icons != IconsOff {
 		sh.userDirs = cfg.Env.UserDirs()
 	}
