@@ -7,9 +7,13 @@ import (
 	"io/fs"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mydisha/lega/internal/oplog"
 )
+
+// defaultScanTimeout stops a wedged daemon or slow mount from stalling a scan.
+const defaultScanTimeout = 30 * time.Second
 
 // Finding is what one rule found during a scan.
 type Finding struct {
@@ -60,9 +64,23 @@ func Scan(ctx context.Context, c *Context, rules []Rule, onDone func(Rule)) []Fi
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			targets, err := r.Scan(ctx, c)
+			rctx := ctx
+			var cancel context.CancelFunc
+			timeout := c.ScanTimeout
+			if timeout == 0 {
+				timeout = defaultScanTimeout
+			}
+			if timeout > 0 {
+				rctx, cancel = context.WithTimeout(ctx, timeout)
+			}
+			targets, err := r.Scan(rctx, c)
+			if cancel != nil {
+				cancel()
+			}
 			if errors.Is(err, fs.ErrNotExist) {
 				err = nil
+			} else if errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil {
+				err = errors.New("timed out while scanning")
 			}
 			found[i] = Finding{Rule: r, Targets: targets, Err: err}
 			if onDone != nil {
@@ -133,6 +151,11 @@ func (c *Context) locked(i Info) string {
 func Clean(ctx context.Context, c *Context, f Finding) Report {
 	info := f.Rule.Info()
 	rep := Report{RuleID: info.ID}
+	if len(info.Processes) > 0 && c.RefreshRunning != nil {
+		if fresh := c.RefreshRunning(); fresh != nil {
+			c.Running = fresh
+		}
+	}
 	if reason := c.locked(info); reason != "" {
 		rep.Failures = append(rep.Failures, Removal{Path: info.Name, Err: reason})
 		return rep

@@ -32,6 +32,14 @@ func testContext(t *testing.T) *Context {
 	t.Setenv("LEGA_NO_OPLOG", "")
 	// Keep rules that read env vars inside the fake home.
 	t.Setenv("GOMODCACHE", filepath.Join(home, "go", "pkg", "mod"))
+	for _, k := range []string{
+		"NPM_CONFIG_CACHE", "YARN_CACHE_FOLDER", "PIP_CACHE_DIR", "UV_CACHE_DIR",
+		"GOCACHE", "CARGO_HOME", "GRADLE_USER_HOME", "COMPOSER_CACHE_DIR",
+		"BUN_INSTALL_CACHE_DIR", "DENO_DIR", "PUB_CACHE", "CCACHE_DIR",
+		"SCCACHE_DIR", "HF_HOME", "CONDA_PKGS_DIRS",
+	} {
+		t.Setenv(k, "")
+	}
 	userDirs := []string{filepath.Join(home, "Documents"), filepath.Join(home, "Downloads")}
 	return &Context{
 		Env:      env,
@@ -148,6 +156,46 @@ func TestLockedWhileAppRuns(t *testing.T) {
 	}
 	if !exists(filepath.Join(c.Env.CacheDir, "mozilla", "cache2")) {
 		t.Error("files of a locked rule were removed")
+	}
+}
+
+func TestLockedIfAppStartsAfterScan(t *testing.T) {
+	c := testContext(t)
+	r := &pathRule{
+		info:  Info{ID: "x", Name: "X", Processes: []string{"firefox"}},
+		spots: []spot{{"$CACHE/mozilla", []string{"*"}}},
+	}
+	write(t, filepath.Join(c.Env.CacheDir, "mozilla", "cache2", "a"), 100)
+
+	found := Scan(context.Background(), c, []Rule{r}, nil)
+	if len(found) != 1 || found[0].Locked != "" {
+		t.Fatalf("expected unlocked finding during scan, got %+v", found)
+	}
+	c.RefreshRunning = func() map[string]bool { return map[string]bool{"firefox": true} }
+	rep := Clean(context.Background(), c, found[0])
+	if rep.Removed != 0 || len(rep.Failures) != 1 || !strings.Contains(rep.Failures[0].Err, "firefox") {
+		t.Errorf("app started after scan must block clean: %+v", rep)
+	}
+	if !exists(filepath.Join(c.Env.CacheDir, "mozilla", "cache2")) {
+		t.Error("files were removed while app was running")
+	}
+}
+
+type slowRule struct{ info Info }
+
+func (r *slowRule) Info() Info { return r.info }
+func (r *slowRule) Scan(ctx context.Context, _ *Context) ([]Target, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+func (r *slowRule) Clean(context.Context, *Context, []Target) []Removal { return nil }
+
+func TestScanTimeout(t *testing.T) {
+	c := testContext(t)
+	c.ScanTimeout = 30 * time.Millisecond
+	found := Scan(context.Background(), c, []Rule{&slowRule{Info{ID: "slow", Name: "Slow"}}}, nil)
+	if len(found) != 1 || found[0].Err == nil || !strings.Contains(found[0].Err.Error(), "timed out") {
+		t.Fatalf("expected timeout error, got %+v", found)
 	}
 }
 
@@ -268,6 +316,14 @@ func TestExpand(t *testing.T) {
 		if got := expand(c, in); got != want {
 			t.Errorf("expand(%q) = %q, want %q", in, got, want)
 		}
+	}
+	t.Setenv("LEGA_TEST_ENV_DIR", "/custom/dir")
+	if got := expand(c, "$ENV:LEGA_TEST_ENV_DIR|$CACHE/fallback"); got != "/custom/dir" {
+		t.Errorf("expand env override = %q", got)
+	}
+	t.Setenv("LEGA_TEST_ENV_DIR", "relative/ignored")
+	if got := expand(c, "$ENV:LEGA_TEST_ENV_DIR|$CACHE/fallback"); got != e.CacheDir+"/fallback" {
+		t.Errorf("expand relative env fallback = %q", got)
 	}
 }
 

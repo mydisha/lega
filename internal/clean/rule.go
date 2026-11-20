@@ -88,6 +88,12 @@ type Context struct {
 	Now      func() time.Time
 	// Running holds the names of the user's running processes.
 	Running map[string]bool
+	// RefreshRunning, when set, reloads Running right before cleaning so
+	// apps started after a scan are still locked.
+	RefreshRunning func() map[string]bool
+	// ScanTimeout limits how long any single rule may spend scanning.
+	// Zero uses the default (30s); a negative value disables the limit.
+	ScanTimeout time.Duration
 }
 
 func (c *Context) guardFor(i Info) *safety.Guard {

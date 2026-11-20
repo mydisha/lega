@@ -58,5 +58,12 @@ func NewContext(env platform.Env, whitelist []string) *Context {
 		LookPath: exec.LookPath,
 		Now:      time.Now,
 		Running:  running,
+		RefreshRunning: func() map[string]bool {
+			fresh, err := platform.Processes("/proc", env.UID)
+			if err != nil {
+				return nil
+			}
+			return fresh
+		},
 	}
 }

@@ -32,8 +32,13 @@ func (r *pathRule) Info() Info { return r.info }
 func (r *pathRule) Scan(ctx context.Context, c *Context) ([]Target, error) {
 	guard := c.guardFor(r.info)
 	var out []Target
+	seen := map[string]bool{}
 	for _, s := range r.spots {
-		roots, _ := filepath.Glob(expand(c, s.root))
+		rootExpr := expand(c, s.root)
+		if rootExpr == "" {
+			continue
+		}
+		roots, _ := filepath.Glob(rootExpr)
 		for _, root := range roots {
 			for _, g := range s.globs {
 				matches, _ := filepath.Glob(filepath.Join(root, g))
@@ -41,7 +46,15 @@ func (r *pathRule) Scan(ctx context.Context, c *Context) ([]Target, error) {
 					if ctx.Err() != nil {
 						return out, ctx.Err()
 					}
+					key := m
+					if real, err := filepath.EvalSymlinks(filepath.Dir(m)); err == nil {
+						key = filepath.Join(real, filepath.Base(m))
+					}
+					if seen[key] {
+						continue
+					}
 					if t, ok := r.target(ctx, c, m, root); ok && guard.Check(m, []string{root}) == nil {
+						seen[key] = true
 						out = append(out, t)
 					}
 				}
@@ -88,8 +101,18 @@ func (r *pathRule) Clean(ctx context.Context, c *Context, targets []Target) []Re
 }
 
 // expand turns the placeholders used in rule paths into real folders:
+// $ENV:VAR|fallback (uses VAR when set to an absolute path, otherwise fallback),
 // ~ (home), $CACHE, $CONFIG, $DATA, $DOWNLOAD, $USER and $UID.
 func expand(c *Context, p string) string {
+	if strings.HasPrefix(p, "$ENV:") {
+		spec := p[len("$ENV:"):]
+		if envKey, fallback, ok := strings.Cut(spec, "|"); ok {
+			if v := os.Getenv(envKey); filepath.IsAbs(v) {
+				return filepath.Clean(v)
+			}
+			p = fallback
+		}
+	}
 	e := c.Env
 	switch {
 	case p == "~" || strings.HasPrefix(p, "~/"):

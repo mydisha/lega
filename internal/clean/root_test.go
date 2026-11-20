@@ -170,10 +170,13 @@ func TestRunRoot(t *testing.T) {
 	if err := runRoot(context.Background(), c, lookup, []string{"nope"}, &out); err == nil {
 		t.Error("unknown ID must be rejected")
 	}
+	if err := runRoot(context.Background(), c, lookup, []string{"../etc/passwd"}, &out); err == nil {
+		t.Error("invalid ID format must be rejected")
+	}
 	if err := runRoot(context.Background(), c, lookup, []string{"user-rule"}, &out); err == nil {
 		t.Error("a rule that does not need root must be rejected")
 	}
-	if err := runRoot(context.Background(), c, lookup, []string{"fake-logs"}, &out); err != nil {
+	if err := runRoot(context.Background(), c, lookup, []string{"fake-logs", "fake-logs"}, &out); err != nil {
 		t.Fatal(err)
 	}
 	var res []rootResult

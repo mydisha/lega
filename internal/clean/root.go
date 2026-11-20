@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ import (
 	"github.com/mydisha/lega/internal/platform"
 	"github.com/mydisha/lega/internal/safety"
 )
+
+var validRuleID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 // RootCommand is the hidden subcommand that runs root rules under sudo.
 const RootCommand = "_root-clean"
@@ -199,11 +202,19 @@ func RootMain(ctx context.Context, ids []string, out io.Writer) error {
 
 func runRoot(ctx context.Context, c *Context, lookup func(string) (Rule, bool), ids []string, out io.Writer) error {
 	var rules []Rule
+	seen := map[string]bool{}
 	for _, id := range ids {
+		if !validRuleID.MatchString(id) {
+			return fmt.Errorf("unknown root rule %q", id)
+		}
+		if seen[id] {
+			continue
+		}
 		r, ok := lookup(id)
 		if !ok || !r.Info().NeedsRoot {
 			return fmt.Errorf("unknown root rule %q", id)
 		}
+		seen[id] = true
 		rules = append(rules, r)
 	}
 	var results []rootResult
@@ -223,10 +234,15 @@ func runRoot(ctx context.Context, c *Context, lookup func(string) (Rule, bool), 
 func rootContext() (*Context, error) {
 	env := platform.Env{Home: "/root", User: "root", UID: 0}
 	if name := os.Getenv("SUDO_USER"); name != "" {
-		if u, err := user.Lookup(name); err == nil {
-			uid, _ := strconv.Atoi(u.Uid)
-			env = platform.Env{Home: u.HomeDir, User: u.Username, UID: uid}
+		u, err := user.Lookup(name)
+		if err != nil {
+			return nil, fmt.Errorf("cannot look up SUDO_USER %q: %w", name, err)
 		}
+		uid, err := strconv.Atoi(u.Uid)
+		if err != nil {
+			return nil, fmt.Errorf("invalid UID for SUDO_USER %q: %w", name, err)
+		}
+		env = platform.Env{Home: u.HomeDir, User: u.Username, UID: uid}
 	}
 	env.CacheDir = filepath.Join(env.Home, ".cache")
 	env.ConfigDir = filepath.Join(env.Home, ".config")
