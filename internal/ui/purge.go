@@ -63,8 +63,15 @@ func newPurger(roots []string) func(*shared) screen {
 		}
 		g := safety.NewGuard(sh.env.Home, sh.env.UID, userDirs)
 		g.Whitelist = wl
-		if len(roots) == 0 {
-			roots = purge.DefaultRoots(sh.env.Home)
+		if len(roots) == 0 && err == nil {
+			custom, rerr := purge.LoadRoots(purge.RootsPath(sh.env.ConfigDir), sh.env.Home)
+			if rerr != nil {
+				err = fmt.Errorf("%w. Fix or remove %s, then try again", rerr, purge.RootsPath(sh.env.ConfigDir))
+			} else if len(custom) > 0 {
+				roots = custom
+			} else {
+				roots = purge.DefaultRoots(sh.env.Home)
+			}
 		}
 		return &purger{
 			sh: sh, roots: roots, err: err,

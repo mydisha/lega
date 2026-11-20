@@ -4,7 +4,10 @@
 package purge
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -12,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/mydisha/lega/internal/oplog"
@@ -20,7 +24,7 @@ import (
 )
 
 // kind is a folder name that is an artifact when one of its markers sits
-// next to it (or, for inside, within it).
+// next to it (or, for inside, within it). Markers may contain glob wildcards.
 type kind struct {
 	name    string
 	markers []string
@@ -34,14 +38,41 @@ var kinds = []kind{
 	{name: ".svelte-kit", markers: []string{"package.json"}},
 	{name: ".parcel-cache", markers: []string{"package.json"}},
 	{name: ".turbo", markers: []string{"package.json"}},
-	{name: "target", markers: []string{"Cargo.toml", "pom.xml"}},
+	{name: ".angular", markers: []string{"angular.json", "package.json"}},
+	{name: ".astro", markers: []string{"package.json"}},
+	{name: ".vite", markers: []string{"package.json"}},
+	{name: ".output", markers: []string{"nuxt.config.ts", "nuxt.config.js", "nitro.config.ts", "package.json"}},
+	{name: ".webpack", markers: []string{"package.json"}},
+	{name: ".nyc_output", markers: []string{"package.json"}},
+	{name: "storybook-static", markers: []string{"package.json"}},
+	{name: ".storybook-static", markers: []string{"package.json"}},
+	{name: "target", markers: []string{"Cargo.toml", "pom.xml", "build.sbt"}},
+	{name: ".bloop", markers: []string{"build.sbt", "build.sc"}},
+	{name: ".metals", markers: []string{"build.sbt", "build.sc"}},
 	{name: ".venv", markers: []string{"pyvenv.cfg"}, inside: true},
 	{name: "venv", markers: []string{"pyvenv.cfg"}, inside: true},
 	{name: "__pycache__"},
 	{name: ".pytest_cache"},
 	{name: ".mypy_cache"},
+	{name: ".ruff_cache"},
+	{name: ".tox", markers: []string{"tox.ini", "pyproject.toml", "setup.cfg"}},
+	{name: ".nox", markers: []string{"noxfile.py"}},
+	{name: ".hypothesis", markers: []string{"pyproject.toml", "setup.py", "pytest.ini"}},
+	{name: "htmlcov", markers: []string{"pyproject.toml", "setup.py", "pytest.ini"}},
+	{name: ".eggs", markers: []string{"setup.py", "pyproject.toml"}},
+	{name: "vendor", markers: []string{"composer.json"}},
+	{name: "_build", markers: []string{"mix.exs"}},
+	{name: "deps", markers: []string{"mix.exs"}},
 	{name: ".gradle", markers: []string{"build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"}},
 	{name: ".dart_tool", markers: []string{"pubspec.yaml"}},
+	{name: "cmake-build-debug", markers: []string{"CMakeLists.txt"}},
+	{name: "cmake-build-release", markers: []string{"CMakeLists.txt"}},
+	{name: "zig-out", markers: []string{"build.zig"}},
+	{name: ".zig-cache", markers: []string{"build.zig"}},
+	{name: "zig-cache", markers: []string{"build.zig"}},
+	{name: "obj", markers: []string{"*.csproj", "*.fsproj"}},
+	{name: ".terraform", markers: []string{".terraform.lock.hcl", "*.tf"}},
+	{name: "coverage", markers: []string{"package.json", "pyproject.toml", "Cargo.toml"}},
 	{name: "build", markers: []string{"package.json", "build.gradle", "build.gradle.kts", "pubspec.yaml", "pyproject.toml", "setup.py"}},
 	{name: "dist", markers: []string{"package.json", "pyproject.toml", "setup.py"}},
 }
@@ -51,6 +82,15 @@ const RecentAge = 7 * 24 * time.Hour
 
 // maxDepth stops the walk from crawling huge trees forever.
 const maxDepth = 10
+
+// gitTimeout bounds how long git ls-files may take on a single folder.
+const gitTimeout = 5 * time.Second
+
+// skipDirs are version-control and system folders purge never descends into.
+var skipDirs = map[string]bool{
+	".git": true, ".hg": true, ".svn": true, ".bzr": true,
+	".cache": true, ".local": true, ".Trash": true,
+}
 
 // Artifact is one folder that can be purged.
 type Artifact struct {
@@ -80,10 +120,62 @@ func NewFinder(g *safety.Guard) *Finder {
 	return &Finder{Guard: g, Now: time.Now, Tracked: gitTracked}
 }
 
+// RootsPath is where users may list custom project folders for purge.
+func RootsPath(configDir string) string {
+	return filepath.Join(configDir, "lega", "purge_paths")
+}
+
+// LoadRoots reads custom search folders from file: one path per line, "#"
+// for comments, "~" for home. A missing file returns nil, nil.
+func LoadRoots(file, home string) ([]string, error) {
+	f, err := os.Open(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read purge paths: %w", err)
+	}
+	defer f.Close()
+
+	var out []string
+	sc := bufio.NewScanner(f)
+	for n := 1; sc.Scan(); n++ {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		for i := 0; i < len(line); i++ {
+			if line[i] < 0x20 || line[i] == 0x7f {
+				return nil, fmt.Errorf("purge paths line %d: invalid characters", n)
+			}
+		}
+		if line == "~" || strings.HasPrefix(line, "~/") {
+			line = filepath.Join(home, strings.TrimPrefix(line, "~"))
+		}
+		if !filepath.IsAbs(line) {
+			return nil, fmt.Errorf("purge paths line %d: %q must start with / or ~/", n, line)
+		}
+		p := filepath.Clean(line)
+		if info, err := os.Stat(p); err == nil && info.IsDir() {
+			out = append(out, p)
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("read purge paths: %w", err)
+	}
+	return out, nil
+}
+
 // DefaultRoots returns the usual project folders that exist in home.
 func DefaultRoots(home string) []string {
 	var out []string
-	for _, name := range []string{"Projects", "projects", "Code", "code", "dev", "Developer", "src", "www", "workspace", "repos", "git"} {
+	names := []string{
+		"Projects", "projects", "Code", "code", "dev", "Developer", "src", "www",
+		"workspace", "Workspace", "Work", "work", "repos", "git",
+		"GitHub", "github", "gitlab", "Sites",
+		"IdeaProjects", "PycharmProjects", "AndroidStudioProjects", "WebstormProjects", "CLionProjects",
+	}
+	for _, name := range names {
 		p := filepath.Join(home, name)
 		if info, err := os.Stat(p); err == nil && info.IsDir() {
 			out = append(out, p)
@@ -95,11 +187,31 @@ func DefaultRoots(home string) []string {
 // Find walks roots and returns artifacts, biggest first.
 func (f *Finder) Find(ctx context.Context, roots []string) ([]Artifact, error) {
 	var found []Artifact
+	seenRoots := map[string]bool{}
+	seenArtifacts := map[string]bool{}
 	for _, root := range roots {
 		root, err := filepath.Abs(root)
 		if err != nil {
 			return nil, err
 		}
+		realRoot := root
+		if r, err := filepath.EvalSymlinks(root); err == nil {
+			realRoot = r
+		}
+		if seenRoots[realRoot] {
+			continue
+		}
+		seenRoots[realRoot] = true
+
+		rinfo, err := os.Lstat(realRoot)
+		if err != nil {
+			return nil, err
+		}
+		var rootDev uint64
+		if st, ok := rinfo.Sys().(*syscall.Stat_t); ok {
+			rootDev = st.Dev
+		}
+
 		depth0 := strings.Count(root, string(filepath.Separator))
 		err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 			if ctx.Err() != nil {
@@ -108,15 +220,34 @@ func (f *Finder) Find(ctx context.Context, roots []string) ([]Artifact, error) {
 			if err != nil || !d.IsDir() {
 				return nil
 			}
-			if strings.Count(p, string(filepath.Separator))-depth0 > maxDepth {
-				return fs.SkipDir
-			}
-			if d.Name() == ".git" {
-				return fs.SkipDir
-			}
-			if p != root && isArtifact(p, d.Name()) {
-				found = append(found, Artifact{Path: p, Kind: d.Name(), Root: root})
-				return fs.SkipDir
+			if p != root {
+				if strings.Count(p, string(filepath.Separator))-depth0 > maxDepth {
+					return fs.SkipDir
+				}
+				if skipDirs[d.Name()] {
+					return fs.SkipDir
+				}
+				// Stay on the same filesystem so mounted drives are never crawled.
+				if info, ierr := d.Info(); ierr == nil {
+					if st, ok := info.Sys().(*syscall.Stat_t); ok && rootDev != 0 && st.Dev != rootDev {
+						return fs.SkipDir
+					}
+				}
+				if isArtifact(p, d.Name()) {
+					key := p
+					if rp, rerr := filepath.EvalSymlinks(p); rerr == nil {
+						key = rp
+					}
+					if !seenArtifacts[key] {
+						seenArtifacts[key] = true
+						found = append(found, Artifact{Path: p, Kind: d.Name(), Root: root})
+					}
+					return fs.SkipDir
+				}
+				// Never descend into orphan node_modules folders.
+				if d.Name() == "node_modules" {
+					return fs.SkipDir
+				}
 			}
 			return nil
 		})
@@ -140,6 +271,12 @@ func isArtifact(path, name string) bool {
 			dir = path
 		}
 		for _, m := range k.markers {
+			if strings.ContainsAny(m, "*?[") {
+				if matches, _ := filepath.Glob(filepath.Join(dir, m)); len(matches) > 0 {
+					return true
+				}
+				continue
+			}
 			if _, err := os.Lstat(filepath.Join(dir, m)); err == nil {
 				return true
 			}
@@ -216,7 +353,9 @@ func gitTracked(path string) bool {
 	if _, err := exec.LookPath("git"); err != nil {
 		return true
 	}
-	cmd := exec.Command("git", "-C", filepath.Dir(path), "ls-files", "-z", "--", filepath.Base(path))
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "-C", filepath.Dir(path), "ls-files", "-z", "--", filepath.Base(path))
 	cmd.Env = gitEnv()
 	out, err := cmd.Output()
 	return err != nil || len(out) > 0

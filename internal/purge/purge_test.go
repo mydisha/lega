@@ -199,3 +199,63 @@ func TestFindCancelled(t *testing.T) {
 		t.Error("expected context error")
 	}
 }
+
+func TestFindAdditionalArtifactsAndDedupe(t *testing.T) {
+	home := t.TempDir()
+	root := filepath.Join(home, "work")
+	write(t, filepath.Join(root, "php", "composer.json"))
+	write(t, filepath.Join(root, "php", "vendor", "pkg", "a.php"))
+	write(t, filepath.Join(root, "dotnet", "App.csproj"))
+	write(t, filepath.Join(root, "dotnet", "obj", "Debug", "a.dll"))
+	write(t, filepath.Join(root, "infra", "main.tf"))
+	write(t, filepath.Join(root, "infra", ".terraform", "providers", "p"))
+	write(t, filepath.Join(root, "zig", "build.zig"))
+	write(t, filepath.Join(root, "zig", "zig-out", "bin", "app"))
+	write(t, filepath.Join(root, "ex", "mix.exs"))
+	write(t, filepath.Join(root, "ex", "_build", "dev", "beam"))
+	write(t, filepath.Join(root, "py", ".ruff_cache", "0.1"))
+	// A vendor dir without composer.json must not match.
+	write(t, filepath.Join(root, "go-app", "vendor", "lib.go"))
+
+	// Duplicate and symlinked roots should not return duplicates.
+	link := filepath.Join(home, "work-link")
+	os.Symlink(root, link)
+	got, err := newFinder(home).Find(context.Background(), []string{root, link, root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"dotnet/obj", "ex/_build", "infra/.terraform", "php/vendor", "py/.ruff_cache", "zig/zig-out",
+	}
+	if r := rel(root, got); !slices.Equal(r, want) {
+		t.Errorf("found %v, want %v", r, want)
+	}
+}
+
+func TestLoadRoots(t *testing.T) {
+	home := t.TempDir()
+	a := filepath.Join(home, "my-projects")
+	os.Mkdir(a, 0o755)
+	file := filepath.Join(home, "purge_paths")
+
+	got, err := LoadRoots(file, home)
+	if err != nil || got != nil {
+		t.Fatalf("missing file: %v, %v", got, err)
+	}
+
+	os.WriteFile(file, []byte("# comment\n\n~/my-projects\n~/missing\n"), 0o644)
+	got, err = LoadRoots(file, home)
+	if err != nil || !slices.Equal(got, []string{a}) {
+		t.Errorf("got %v, %v; want [%s]", got, err, a)
+	}
+
+	os.WriteFile(file, []byte("relative/dir\n"), 0o644)
+	if _, err := LoadRoots(file, home); err == nil {
+		t.Error("relative path should fail")
+	}
+
+	os.WriteFile(file, []byte("/bad/\x00dir\n"), 0o644)
+	if _, err := LoadRoots(file, home); err == nil {
+		t.Error("control char should fail")
+	}
+}
