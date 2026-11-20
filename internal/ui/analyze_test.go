@@ -152,6 +152,34 @@ func TestAnalyzeGuardRefuses(t *testing.T) {
 	}
 }
 
+func TestAnalyzeRespectsWhitelist(t *testing.T) {
+	sh := testShared(t, 80)
+	homeTree(t, sh)
+	wlPath := filepath.Join(sh.env.ConfigDir, "lega", "whitelist")
+	os.MkdirAll(filepath.Dir(wlPath), 0o755)
+	os.WriteFile(wlPath, []byte("~/media\n"), 0o644)
+
+	a := startAnalyze(t, sh, "")
+	sendKeys(a, "d", "y")
+	if _, err := os.Stat(filepath.Join(sh.env.Home, "media", "big.mkv")); err != nil {
+		t.Fatal("whitelisted folder must not be removed from analyze")
+	}
+	if !a.noteErr || !strings.Contains(a.note, "whitelisted") {
+		t.Errorf("expected whitelist refusal note, got %q", a.note)
+	}
+
+	// An invalid whitelist stops deletion in analyze instead of ignoring it.
+	os.WriteFile(wlPath, []byte("relative/path\n"), 0o644)
+	a = startAnalyze(t, sh, "")
+	sendKeys(a, "d", "y")
+	if _, err := os.Stat(filepath.Join(sh.env.Home, "media", "big.mkv")); err != nil {
+		t.Fatal("analyze deleted with an invalid whitelist")
+	}
+	if !a.noteErr || !strings.Contains(a.note, "whitelist") {
+		t.Errorf("expected whitelist error note, got %q", a.note)
+	}
+}
+
 func TestAnalyzeStates(t *testing.T) {
 	sh := testShared(t, 80)
 	a := newAnalyze(filepath.Join(sh.env.Home, "missing"))(sh).(*analyze)

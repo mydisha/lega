@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/mydisha/lega/internal/clean"
 	"github.com/mydisha/lega/internal/format"
 	"github.com/mydisha/lega/internal/oplog"
 	"github.com/mydisha/lega/internal/safety"
@@ -62,6 +62,7 @@ type analyze struct {
 
 	trash trash.Trash
 	guard *safety.Guard
+	wlErr error
 	log   *oplog.Log
 }
 
@@ -84,6 +85,13 @@ func newAnalyze(root string) func(*shared) screen {
 		for _, d := range sh.env.UserDirs() {
 			userDirs = append(userDirs, d)
 		}
+		g := safety.NewGuard(sh.env.Home, sh.env.UID, userDirs)
+		wl, wlErr := safety.LoadWhitelist(clean.WhitelistPath(sh.env), sh.env.Home)
+		if wlErr != nil {
+			wlErr = fmt.Errorf("%w. Fix or remove %s before deleting", wlErr, clean.WhitelistPath(sh.env))
+		} else {
+			g.Whitelist = wl
+		}
 		return &analyze{
 			sh:      sh,
 			root:    root,
@@ -91,7 +99,8 @@ func newAnalyze(root string) func(*shared) screen {
 			spin:    spinner.New(spinner.WithSpinner(spinner.MiniDot)),
 			cursors: map[*scan.Node]int{},
 			trash:   trash.Trash{DataDir: sh.env.DataDir, UID: sh.env.UID},
-			guard:   safety.NewGuard(sh.env.Home, sh.env.UID, userDirs),
+			guard:   g,
+			wlErr:   wlErr,
 			log:     oplog.Open(sh.env.StateDir),
 		}
 	}
@@ -248,8 +257,13 @@ func (a *analyze) goTo(dir, focus *scan.Node) {
 func (a *analyze) remove() tea.Cmd {
 	n := a.confirm
 	a.confirm = nil
+	if a.wlErr != nil {
+		a.note, a.noteErr = a.wlErr.Error(), true
+		return nil
+	}
 	path := n.Path()
-	if err := a.guard.Check(path, []string{a.tree.Path()}); err != nil {
+	roots := []string{a.tree.Path()}
+	if err := a.guard.Check(path, roots); err != nil {
 		a.note, a.noteErr = err.Error(), true
 		return nil
 	}
@@ -257,7 +271,7 @@ func (a *analyze) remove() tea.Cmd {
 	var err error
 	if a.permanent {
 		action = "delete"
-		err = os.RemoveAll(path)
+		err = a.guard.Remove(path, roots)
 	} else {
 		_, err = a.trash.Move(path)
 		if errors.Is(err, trash.ErrNoTrash) {
